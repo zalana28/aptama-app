@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
+import { AdminBadge } from './AdminLogin'
 
 const links = [
-  { to: '/', label: '🏠 Beranda' },
-  { to: '/anggota', label: '👥 Anggota' },
-  { to: '/kegiatan', label: '📅 Kegiatan' },
-  { to: '/absensi', label: '📋 Absensi' },
-  { to: '/rekap', label: '📊 Rekap' },
+  { to: '/', label: '🏠 Beranda', admin: false },
+  { to: '/anggota', label: '👥 Anggota', admin: true },
+  { to: '/kegiatan', label: '📅 Kegiatan', admin: true },
+  { to: '/absensi', label: '📋 Absensi', admin: true },
+  { to: '/rekap', label: '📊 Rekap', admin: false },
 ]
 
 export function Navbar() {
@@ -26,8 +27,12 @@ export function Navbar() {
             }
           >
             {l.label}
+            {l.admin && <span className="ml-0.5 text-[10px] opacity-50">🔑</span>}
           </NavLink>
         ))}
+        <div className="ml-auto shrink-0">
+          <AdminBadge />
+        </div>
       </div>
     </nav>
   )

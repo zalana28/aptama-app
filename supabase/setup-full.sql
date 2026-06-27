@@ -36,6 +36,14 @@ CREATE TABLE IF NOT EXISTS admin_config (
   value text NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS qr_tokens (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid REFERENCES events(id) ON DELETE CASCADE,
+  token text UNIQUE NOT NULL,
+  expires_at timestamptz NOT NULL,
+  created_at timestamptz DEFAULT now()
+);
+
 -- ============================================
 -- VIEWS (create or replace)
 -- ============================================
@@ -109,6 +117,39 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
+
+CREATE OR REPLACE FUNCTION public.generate_qr_token(p_event_id uuid, p_pin text, p_duration_minutes int DEFAULT 120)
+RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_hash text; v_token text;
+BEGIN
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
+  IF v_hash <> encode(digest(p_pin, 'sha256'), 'hex') THEN
+    RAISE EXCEPTION 'PIN salah';
+  END IF;
+  v_token := encode(gen_random_bytes(16), 'hex');
+  INSERT INTO qr_tokens (event_id, token, expires_at)
+  VALUES (p_event_id, v_token, now() + (p_duration_minutes || ' minutes')::interval);
+  RETURN v_token;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.generate_qr_token(uuid, text, int) TO anon;
+
+CREATE OR REPLACE FUNCTION public.scan_qr_attendance(p_token text, p_member_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_event_id uuid; v_expires timestamptz;
+BEGIN
+  SELECT event_id, expires_at INTO v_event_id, v_expires
+  FROM qr_tokens WHERE token = p_token;
+  IF v_event_id IS NULL THEN RAISE EXCEPTION 'QR code tidak valid';
+  END IF;
+  IF now() > v_expires THEN RAISE EXCEPTION 'QR code sudah kedaluwarsa';
+  END IF;
+  INSERT INTO attendances (event_id, member_id, status)
+  VALUES (v_event_id, p_member_id, 'hadir')
+  ON CONFLICT (event_id, member_id) DO UPDATE SET status = 'hadir';
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.scan_qr_attendance(text, uuid) TO anon;
 
 -- ============================================
 -- ADMIN PIN (default: 1234)

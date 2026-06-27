@@ -45,9 +45,10 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================
--- RLS + GRANTS (client-side CRUD)
+-- RLS + GRANTS + POLICIES (client-side CRUD)
 -- Threat model: internal/community use, Ketua-only mutation
--- via UI gate (PIN). RLS off, direct table grants to anon.
+-- via UI gate (PIN). RLS off + permissive policies fallback
+-- supaya tetap jalan walaupun Supabase force-enable RLS.
 -- For production-grade security, replace with RLS policies
 -- + SECURITY DEFINER RPCs.
 -- ============================================
@@ -56,6 +57,18 @@ ALTER TABLE events DISABLE ROW LEVEL SECURITY;
 ALTER TABLE attendances DISABLE ROW LEVEL SECURITY;
 ALTER TABLE qr_tokens DISABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_config DISABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_all_members" ON members;
+DROP POLICY IF EXISTS "anon_all_events" ON events;
+DROP POLICY IF EXISTS "anon_all_attendances" ON attendances;
+DROP POLICY IF EXISTS "anon_all_qr_tokens" ON qr_tokens;
+DROP POLICY IF EXISTS "anon_all_admin_config" ON admin_config;
+
+CREATE POLICY "anon_all_members" ON members FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_events" ON events FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_attendances" ON attendances FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_qr_tokens" ON qr_tokens FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_admin_config" ON admin_config FOR ALL TO anon USING (true) WITH CHECK (true);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON members TO anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON events TO anon;

@@ -4,6 +4,7 @@ const links = [
   { to: '/', label: '🏠 Beranda' },
   { to: '/anggota', label: '👥 Anggota' },
   { to: '/kegiatan', label: '📅 Kegiatan' },
+  { to: '/absensi', label: '📋 Absensi' },
   { to: '/rekap', label: '📊 Rekap' },
 ]
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useEvents, useAddEvent, useUpdateEvent, useDeleteEvent } from '../hooks/useEvents'
+import { errorMessage } from '../lib/errors'
 import type { Event } from '../types'
 
 type FormData = { title: string; date: string; location: string }
@@ -74,8 +75,7 @@ export function Events() {
       }
       cancelForm()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menyimpan kegiatan.'
-      setErrorMsg(msg)
+      setErrorMsg(errorMessage(err, 'Gagal menyimpan kegiatan.'))
     }
   }
 
@@ -85,8 +85,7 @@ export function Events() {
     try {
       await deleteEvent.mutateAsync(id)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus kegiatan.'
-      setErrorMsg(msg)
+      setErrorMsg(errorMessage(err, 'Gagal menghapus kegiatan.'))
     }
   }
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMembers, useAddMember, useUpdateMember, useDeleteMember } from '../hooks/useMembers'
+import { errorMessage } from '../lib/errors'
 import type { Member } from '../types'
 
 type FormData = { name: string; group: string; phone: string }
@@ -60,8 +61,7 @@ export function Members() {
       }
       cancelForm()
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menyimpan anggota.'
-      setErrorMsg(msg)
+      setErrorMsg(errorMessage(err, 'Gagal menyimpan anggota.'))
     }
   }
 
@@ -71,8 +71,7 @@ export function Members() {
     try {
       await deleteMember.mutateAsync(id)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.'
-      setErrorMsg(msg)
+      setErrorMsg(errorMessage(err, 'Gagal menghapus anggota.'))
     }
   }
 

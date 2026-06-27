@@ -1,42 +1,36 @@
-import { NavLink } from 'react-router-dom'
-import { AdminBadge } from './AdminLogin'
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { Menu } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { Logo } from './Logo'
-
-const links = [
-  { to: '/', label: '🏠 Beranda', admin: false },
-  { to: '/anggota', label: '👥 Anggota', admin: true },
-  { to: '/kegiatan', label: '📅 Kegiatan', admin: true },
-  { to: '/absensi', label: '📋 Absensi', admin: true },
-  { to: '/generate-qr', label: '📱 QR', admin: true },
-  { to: '/rekap', label: '📊 Rekap', admin: false },
-]
+import { Drawer } from './Drawer'
 
 export function Navbar() {
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   return (
-    <nav className="glass sticky top-0 z-50">
-      <div className="max-w-2xl mx-auto flex items-center gap-2 px-4 py-2 overflow-x-auto">
-        <Logo size={28} className="shrink-0" />
-        {links.map((l) => (
-          <NavLink
-            key={l.to}
-            to={l.to}
-            end={l.to === '/'}
-            className={({ isActive }) =>
-              `px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition ${
-                isActive
-                  ? 'bg-primary text-white font-medium shadow-lg shadow-primary/20'
-                  : 'text-text-muted hover:text-text hover:bg-white/5'
-              }`
-            }
+    <>
+      <nav className="sticky top-0 z-40 bg-bg/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-2xl mx-auto flex items-center justify-between px-4 h-14">
+          {/* Left: Logo + title */}
+          <Link to="/" className="flex items-center gap-2.5">
+            <Logo size={26} />
+            <span className="font-heading font-bold text-sm text-white">Beranda</span>
+          </Link>
+
+          {/* Right: Hamburger */}
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setDrawerOpen(true)}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+            aria-label="Menu"
           >
-            {l.label}
-            {l.admin && <span className="ml-0.5 text-[10px] opacity-50">🔑</span>}
-          </NavLink>
-        ))}
-        <div className="ml-auto shrink-0">
-          <AdminBadge />
+            <Menu size={20} className="text-text-secondary" />
+          </motion.button>
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </>
   )
 }

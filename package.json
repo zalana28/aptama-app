@@ -12,6 +12,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
     "@tanstack/react-query": "^5.101.1",
+    "framer-motion": "^12.42.0",
+    "lucide-react": "^1.21.0",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

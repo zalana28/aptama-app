@@ -10,31 +10,62 @@ export function Home() {
           Angkatan Pucanganom Tiga Muda
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 max-w-xs mx-auto pt-4">
-        <a
-          href="/anggota"
-          className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-primary/50 transition"
-        >
-          <div className="text-2xl">👥</div>
-          <div className="text-xs mt-1 text-text-muted">Anggota</div>
-        </a>
-        <a
-          href="/kegiatan"
-          className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-primary/50 transition"
-        >
-          <div className="text-2xl">📅</div>
-          <div className="text-xs mt-1 text-text-muted">Kegiatan</div>
-        </a>
-        <a
-          href="/rekap"
-          className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-primary/50 transition"
-        >
-          <div className="text-2xl">📊</div>
-          <div className="text-xs mt-1 text-text-muted">Rekap</div>
-        </a>
-        <div className="bg-bg-card border border-white/10 rounded-xl p-4 text-center opacity-50">
-          <div className="text-2xl">📱</div>
-          <div className="text-xs mt-1 text-text-muted">QR Scan</div>
+
+      {/* Menu anggota (publik) */}
+      <div className="space-y-2">
+        <p className="text-xs text-text-muted uppercase tracking-wider">Untuk Anggota</p>
+        <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto">
+          <a
+            href="/checkin"
+            className="bg-bg-card border border-primary/30 rounded-xl p-4 text-center hover:border-primary transition"
+          >
+            <div className="text-2xl">🏠</div>
+            <div className="text-xs mt-1 font-medium text-primary">Check-in</div>
+            <div className="text-[10px] text-text-muted mt-0.5">dari Rumah</div>
+          </a>
+          <a
+            href="/izin"
+            className="bg-bg-card border border-warning/30 rounded-xl p-4 text-center hover:border-warning transition"
+          >
+            <div className="text-2xl">📝</div>
+            <div className="text-xs mt-1 font-medium text-warning">Ajukan</div>
+            <div className="text-[10px] text-text-muted mt-0.5">Izin</div>
+          </a>
+          <a
+            href="/rekap"
+            className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-white/30 transition"
+          >
+            <div className="text-2xl">📊</div>
+            <div className="text-xs mt-1 text-text-muted">Rekap</div>
+          </a>
+        </div>
+      </div>
+
+      {/* Menu admin */}
+      <div className="space-y-2 pt-4">
+        <p className="text-xs text-text-muted uppercase tracking-wider">🔑 Mode Ketua</p>
+        <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto opacity-60">
+          <a
+            href="/anggota"
+            className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-white/30 transition"
+          >
+            <div className="text-2xl">👥</div>
+            <div className="text-xs mt-1 text-text-muted">Anggota</div>
+          </a>
+          <a
+            href="/kegiatan"
+            className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-white/30 transition"
+          >
+            <div className="text-2xl">📅</div>
+            <div className="text-xs mt-1 text-text-muted">Kegiatan</div>
+          </a>
+          <a
+            href="/absensi"
+            className="bg-bg-card border border-white/10 rounded-xl p-4 text-center hover:border-white/30 transition"
+          >
+            <div className="text-2xl">📋</div>
+            <div className="text-xs mt-1 text-text-muted">Absensi</div>
+          </a>
         </div>
       </div>
     </div>

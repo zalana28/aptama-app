@@ -8,6 +8,8 @@ import { Members } from './pages/Members'
 import { Events } from './pages/Events'
 import { Attendance } from './pages/Attendance'
 import { Recap } from './pages/Recap'
+import { AjukanIzin } from './pages/AjukanIzin'
+import { SelfCheckIn } from './pages/SelfCheckIn'
 
 const queryClient = new QueryClient()
 
@@ -23,6 +25,8 @@ function App() {
             <Route path="/kegiatan" element={<AdminGate><Events /></AdminGate>} />
             <Route path="/absensi" element={<AdminGate><Attendance /></AdminGate>} />
             <Route path="/rekap" element={<Recap />} />
+            <Route path="/izin" element={<AjukanIzin />} />
+            <Route path="/checkin" element={<SelfCheckIn />} />
           </Routes>
         </BrowserRouter>
       </AdminProvider>

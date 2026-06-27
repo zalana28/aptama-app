@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { AdminBadge } from './AdminLogin'
+import { Logo } from './Logo'
 
 const links = [
   { to: '/', label: '🏠 Beranda', admin: false },
@@ -12,8 +13,9 @@ const links = [
 
 export function Navbar() {
   return (
-    <nav className="bg-bg-card border-b border-white/10 sticky top-0 z-50">
-      <div className="max-w-2xl mx-auto flex items-center gap-1 px-4 py-2 overflow-x-auto">
+    <nav className="glass sticky top-0 z-50">
+      <div className="max-w-2xl mx-auto flex items-center gap-2 px-4 py-2 overflow-x-auto">
+        <Logo size={28} className="shrink-0" />
         {links.map((l) => (
           <NavLink
             key={l.to}
@@ -22,7 +24,7 @@ export function Navbar() {
             className={({ isActive }) =>
               `px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition ${
                 isActive
-                  ? 'bg-primary text-white font-medium'
+                  ? 'bg-primary text-white font-medium shadow-lg shadow-primary/20'
                   : 'text-text-muted hover:text-text hover:bg-white/5'
               }`
             }

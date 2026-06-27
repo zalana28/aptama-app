@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
+import { Logo } from './Logo'
 
 export function AdminLogin() {
   const { login } = useAdmin()
@@ -21,14 +22,14 @@ export function AdminLogin() {
 
   return (
     <div className="max-w-sm mx-auto px-4 py-16 space-y-6 text-center">
-      <div className="space-y-2">
-        <div className="text-4xl">🔐</div>
-        <h1 className="text-xl font-bold">Mode Ketua</h1>
+      <div className="space-y-3 animate-fade-in">
+        <Logo size={64} className="mx-auto" />
+        <h1 className="text-xl font-bold font-heading gradient-text">Mode Ketua</h1>
         <p className="text-text-muted text-sm">
           Masukkan PIN admin untuk mengakses fitur kelola data.
         </p>
       </div>
-      <form onSubmit={handleSubmit} className="space-y-3">
+      <form onSubmit={handleSubmit} className="space-y-3 animate-fade-in" style={{ animationDelay: '0.1s' }}>
         <input
           type="password"
           inputMode="numeric"
@@ -37,14 +38,14 @@ export function AdminLogin() {
           placeholder="Masukkan PIN"
           value={pin}
           onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-          className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary"
+          className="w-full bg-bg-input border border-white/10 rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
           autoFocus
         />
         {error && <p className="text-danger text-sm">{error}</p>}
         <button
           type="submit"
           disabled={loading || !pin}
-          className="w-full bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
+          className="w-full bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition disabled:opacity-50 shadow-lg shadow-primary/20"
         >
           {loading ? 'Memverifikasi...' : '🔓 Masuk'}
         </button>
@@ -61,7 +62,7 @@ export function AdminBadge() {
   return (
     <button
       onClick={logout}
-      className="px-2 py-0.5 rounded text-xs bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition"
+      className="px-2 py-0.5 rounded-lg text-xs bg-primary/20 text-primary border border-primary/30 hover:bg-primary/30 transition font-medium"
       title="Klik untuk keluar mode admin"
     >
       🔑 Ketua

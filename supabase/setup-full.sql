@@ -84,8 +84,11 @@ GRANT SELECT ON member_recap TO anon, authenticated;
 CREATE OR REPLACE FUNCTION public.submit_izin(p_event_id uuid, p_member_id uuid, p_reason text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
+  IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
+    RAISE EXCEPTION 'Alasan izin wajib diisi';
+  END IF;
   INSERT INTO attendances (event_id, member_id, status, note)
-  VALUES (p_event_id, p_member_id, 'izin', p_reason)
+  VALUES (p_event_id, p_member_id, 'izin', trim(p_reason))
   ON CONFLICT (event_id, member_id) DO UPDATE SET status = 'izin', note = EXCLUDED.note;
 END;
 $$;
@@ -158,3 +161,30 @@ GRANT EXECUTE ON FUNCTION public.scan_qr_attendance(text, uuid) TO anon;
 INSERT INTO admin_config (key, value)
 VALUES ('pin_hash', encode(digest('1234', 'sha256'), 'hex'))
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================
+-- ADMIN: Get attendance WITH notes (alasan izin)
+-- Ketua-only: verify PIN, return rows including `note` column.
+-- ============================================
+CREATE OR REPLACE FUNCTION public.admin_get_attendance(p_event_id uuid, p_pin text)
+RETURNS TABLE (
+  id uuid,
+  event_id uuid,
+  member_id uuid,
+  status text,
+  note text
+)
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_hash text;
+BEGIN
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
+  IF v_hash IS NULL OR v_hash <> encode(digest(p_pin, 'sha256'), 'hex') THEN
+    RAISE EXCEPTION 'PIN salah';
+  END IF;
+  RETURN QUERY
+    SELECT a.id, a.event_id, a.member_id, a.status, a.note
+    FROM attendances a
+    WHERE a.event_id = p_event_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_get_attendance(uuid, text) TO anon;

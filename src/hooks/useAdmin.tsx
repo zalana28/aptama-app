@@ -22,8 +22,9 @@ export function AdminProvider({ children }: { children: ReactNode }) {
 
   async function verifyPin(pin: string): Promise<boolean> {
     const { data, error } = await supabase.rpc('admin_verify_pin', { p_pin: pin })
-    if (error || !data) return false
-    return true
+    console.log('[admin_verify_pin]', { data, error, pin })
+    if (error) return false
+    return data === true
   }
 
   async function login(pin: string): Promise<boolean> {

@@ -6,6 +6,7 @@ const links = [
   { to: '/anggota', label: '👥 Anggota', admin: true },
   { to: '/kegiatan', label: '📅 Kegiatan', admin: true },
   { to: '/absensi', label: '📋 Absensi', admin: true },
+  { to: '/generate-qr', label: '📱 QR', admin: true },
   { to: '/rekap', label: '📊 Rekap', admin: false },
 ]
 

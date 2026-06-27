@@ -45,6 +45,24 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================
+-- RLS + GRANTS (client-side CRUD)
+-- Threat model: internal/community use, Ketua-only mutation
+-- via UI gate (PIN). RLS off, direct table grants to anon.
+-- For production-grade security, replace with RLS policies
+-- + SECURITY DEFINER RPCs.
+-- ============================================
+ALTER TABLE members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE attendances DISABLE ROW LEVEL SECURITY;
+ALTER TABLE qr_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_config DISABLE ROW LEVEL SECURITY;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON members TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON events TO anon;
+-- attendances: no SELECT grant (privasi — view attendance_public tanpa 'note' yang dipakai client)
+GRANT INSERT, UPDATE, DELETE ON attendances TO anon;
+
+-- ============================================
 -- VIEWS (create or replace)
 -- ============================================
 

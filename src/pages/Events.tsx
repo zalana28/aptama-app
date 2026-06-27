@@ -29,43 +29,65 @@ export function Events() {
   const [form, setForm] = useState<FormData>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  function clearError() {
+    setErrorMsg('')
+    addEvent.reset()
+    updateEvent.reset()
+    deleteEvent.reset()
+  }
 
   function startEdit(ev: Event) {
     setEditingId(ev.id)
     setForm({ title: ev.title, date: ev.date, location: ev.location ?? '' })
     setShowForm(true)
+    clearError()
   }
 
   function cancelForm() {
     setEditingId(null)
     setForm(emptyForm)
     setShowForm(false)
+    clearError()
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.date) return
+    clearError()
 
-    if (editingId) {
-      await updateEvent.mutateAsync({
-        id: editingId,
-        title: form.title.trim(),
-        date: form.date,
-        location: form.location.trim() || undefined,
-      })
-    } else {
-      await addEvent.mutateAsync({
-        title: form.title.trim(),
-        date: form.date,
-        location: form.location.trim() || undefined,
-      })
+    try {
+      if (editingId) {
+        await updateEvent.mutateAsync({
+          id: editingId,
+          title: form.title.trim(),
+          date: form.date,
+          location: form.location.trim() || undefined,
+        })
+      } else {
+        await addEvent.mutateAsync({
+          title: form.title.trim(),
+          date: form.date,
+          location: form.location.trim() || undefined,
+        })
+      }
+      cancelForm()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan kegiatan.'
+      setErrorMsg(msg)
     }
-    cancelForm()
   }
 
   async function handleDelete(id: string, title: string) {
     if (!confirm(`Hapus kegiatan "${title}"? Data absensi terkait juga akan terhapus.`)) return
-    await deleteEvent.mutateAsync(id)
+    clearError()
+    try {
+      await deleteEvent.mutateAsync(id)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menghapus kegiatan.'
+      setErrorMsg(msg)
+    }
   }
 
   // Pisahkan upcoming vs lampau
@@ -115,6 +137,15 @@ export function Events() {
             onChange={(e) => setForm({ ...form, location: e.target.value })}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
+          {errorMsg && (
+            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
+              <p className="text-danger text-xs">⚠️ {errorMsg}</p>
+              <p className="text-text-muted text-[10px] mt-1">
+                Kalau pesan 'permission denied' atau 'new row violates row-level security',
+                jalankan ulang supabase/setup-full.sql di SQL Editor (idempotent, aman).
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"

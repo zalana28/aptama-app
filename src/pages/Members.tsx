@@ -15,43 +15,65 @@ export function Members() {
   const [form, setForm] = useState<FormData>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  function clearError() {
+    setErrorMsg('')
+    addMember.reset()
+    updateMember.reset()
+    deleteMember.reset()
+  }
 
   function startEdit(m: Member) {
     setEditingId(m.id)
     setForm({ name: m.name, group: m.group ?? '', phone: m.phone ?? '' })
     setShowForm(true)
+    clearError()
   }
 
   function cancelForm() {
     setEditingId(null)
     setForm(emptyForm)
     setShowForm(false)
+    clearError()
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) return
+    clearError()
 
-    if (editingId) {
-      await updateMember.mutateAsync({
-        id: editingId,
-        name: form.name.trim(),
-        group: form.group.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-      })
-    } else {
-      await addMember.mutateAsync({
-        name: form.name.trim(),
-        group: form.group.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-      })
+    try {
+      if (editingId) {
+        await updateMember.mutateAsync({
+          id: editingId,
+          name: form.name.trim(),
+          group: form.group.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+        })
+      } else {
+        await addMember.mutateAsync({
+          name: form.name.trim(),
+          group: form.group.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+        })
+      }
+      cancelForm()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menyimpan anggota.'
+      setErrorMsg(msg)
     }
-    cancelForm()
   }
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Hapus anggota "${name}"?`)) return
-    await deleteMember.mutateAsync(id)
+    clearError()
+    try {
+      await deleteMember.mutateAsync(id)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Gagal menghapus anggota.'
+      setErrorMsg(msg)
+    }
   }
 
   return (
@@ -97,6 +119,15 @@ export function Members() {
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
+          {errorMsg && (
+            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
+              <p className="text-danger text-xs">⚠️ {errorMsg}</p>
+              <p className="text-text-muted text-[10px] mt-1">
+                Kalau pesan 'permission denied' atau 'new row violates row-level security',
+                jalankan ulang supabase/setup-full.sql di SQL Editor (idempotent, aman).
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"

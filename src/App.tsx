@@ -1,21 +1,25 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Navbar } from './components/Navbar'
+import { Home } from './pages/Home'
+import { Members } from './pages/Members'
+import { Events } from './pages/Events'
+import { Recap } from './pages/Recap'
 
 const queryClient = new QueryClient()
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen flex flex-col items-center justify-center px-4">
-        <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold text-primary">🗑️ APTAMA</h1>
-          <p className="text-text-muted text-sm">
-            Aplikasi Absensi Pemuda — Kegiatan Bersih Sampah
-          </p>
-          <p className="text-secondary text-xs">
-            Angkatan Pucanganom Tiga Muda
-          </p>
-        </div>
-      </div>
+      <BrowserRouter>
+        <Navbar />
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/anggota" element={<Members />} />
+          <Route path="/kegiatan" element={<Events />} />
+          <Route path="/rekap" element={<Recap />} />
+        </Routes>
+      </BrowserRouter>
     </QueryClientProvider>
   )
 }

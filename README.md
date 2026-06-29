@@ -1,4 +1,4 @@
-# 🗑️ APTAMA Attendance
+#  APTAMA Attendance
 
 > Aplikasi absensi pemuda untuk kegiatan bersih sampah — **Angkatan Pucanganom Tiga Muda**.
 

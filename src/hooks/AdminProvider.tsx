@@ -1,13 +1,6 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-
-interface AdminCtx {
-  isAdmin: boolean
-  login: (pin: string) => Promise<boolean>
-  logout: () => void
-}
-
-const AdminContext = createContext<AdminCtx>({ isAdmin: false, login: async () => false, logout: () => {} })
+import { AdminContext } from './AdminContext'
 
 const STORAGE_KEY = 'aptama_admin_pin'
 
@@ -46,8 +39,4 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       {children}
     </AdminContext.Provider>
   )
-}
-
-export function useAdmin() {
-  return useContext(AdminContext)
 }

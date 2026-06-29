@@ -2,6 +2,11 @@
 -- Jalankan SEMUA ini di SQL Editor Supabase
 
 -- ============================================
+-- EXTENSIONS
+-- ============================================
+create extension if not exists pgcrypto;
+
+-- ============================================
 -- TABEL
 -- ============================================
 
@@ -10,6 +15,11 @@ CREATE TABLE IF NOT EXISTS members (
   name text NOT NULL,
   "group" text,
   phone text,
+  -- face verification
+  face_descriptor jsonb,
+  face_status text DEFAULT 'none' CHECK (face_status IN ('none', 'pending', 'approved')),
+  face_enrolled_at timestamptz,
+  face_selfie_url text,
   created_at timestamptz DEFAULT now()
 );
 
@@ -28,8 +38,19 @@ CREATE TABLE IF NOT EXISTS attendances (
   member_id uuid REFERENCES members(id) ON DELETE CASCADE,
   status text NOT NULL CHECK (status IN ('hadir', 'izin', 'alfa')),
   note text,
+  -- face verification / anti-cheat
+  selfie_url text,
+  device_hash text,
+  face_match_score numeric,
+  verified_status text DEFAULT 'auto' CHECK (verified_status IN ('auto', 'manual', 'pending')),
+  submitted_at timestamptz DEFAULT now(),
   UNIQUE (event_id, member_id)
 );
+
+-- 1 device hanya boleh 1x submit per kegiatan
+CREATE UNIQUE INDEX IF NOT EXISTS uq_attendance_device
+  ON attendances (event_id, device_hash)
+  WHERE device_hash IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS admin_config (
   key text PRIMARY KEY,
@@ -49,7 +70,8 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 -- ============================================
 
 CREATE OR REPLACE VIEW attendance_public AS
-  SELECT id, event_id, member_id, status FROM attendances;
+  SELECT id, event_id, member_id, status, verified_status, submitted_at
+  FROM attendances;
 
 GRANT SELECT ON attendance_public TO anon, authenticated;
 
@@ -78,9 +100,28 @@ GROUP BY m.id, m.name;
 GRANT SELECT ON member_recap TO anon, authenticated;
 
 -- ============================================
+-- STORAGE BUCKET UNTUK SELFIE (private)
+-- ============================================
+
+insert into storage.buckets (id, name, public)
+values ('face-selfies', 'face-selfies', false)
+on conflict (id) do nothing;
+
+-- Anon boleh upload selfie saat enroll/absen
+CREATE POLICY IF NOT EXISTS "public_upload_selfies"
+  ON storage.objects FOR INSERT TO anon
+  WITH CHECK (bucket_id = 'face-selfies');
+
+-- Admin bisa baca selfie (via signed URL / RPC)
+CREATE POLICY IF NOT EXISTS "admin_read_selfies"
+  ON storage.objects FOR SELECT TO anon
+  USING (bucket_id = 'face-selfies');
+
+-- ============================================
 -- RPC FUNCTIONS
 -- ============================================
 
+-- Izin mandiri (anggota tanpa akun)
 CREATE OR REPLACE FUNCTION public.submit_izin(p_event_id uuid, p_member_id uuid, p_reason text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
@@ -91,6 +132,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.submit_izin(uuid, uuid, text) TO anon;
 
+-- Check-in dari rumah (sebelum jam mulai)
 CREATE OR REPLACE FUNCTION public.self_check_in(p_event_id uuid, p_member_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_close timestamptz;
@@ -107,6 +149,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.self_check_in(uuid, uuid) TO anon;
 
+-- Verifikasi PIN
 CREATE OR REPLACE FUNCTION public.admin_verify_pin(p_pin text)
 RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_hash text;
@@ -118,7 +161,26 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
 
-CREATE OR REPLACE FUNCTION public.generate_qr_token(p_event_id uuid, p_pin text, p_duration_minutes int DEFAULT 120)
+-- Ganti PIN
+CREATE OR REPLACE FUNCTION public.admin_change_pin(p_old_pin text, p_new_pin text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_hash text;
+BEGIN
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
+  IF v_hash <> encode(digest(p_old_pin, 'sha256'), 'hex') THEN
+    RAISE EXCEPTION 'PIN lama salah';
+  END IF;
+  UPDATE admin_config SET value = encode(digest(p_new_pin, 'sha256'), 'hex') WHERE key = 'pin_hash';
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_change_pin(text, text) TO anon;
+
+-- Generate QR token
+CREATE OR REPLACE FUNCTION public.generate_qr_token(
+  p_event_id uuid,
+  p_pin text,
+  p_duration_minutes int DEFAULT 120
+)
 RETURNS text LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_hash text; v_token text;
 BEGIN
@@ -134,22 +196,182 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.generate_qr_token(uuid, text, int) TO anon;
 
+-- Legacy QR scan (tanpa wajah) — tetap ada untuk fallback/manual
 CREATE OR REPLACE FUNCTION public.scan_qr_attendance(p_token text, p_member_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_event_id uuid; v_expires timestamptz;
 BEGIN
   SELECT event_id, expires_at INTO v_event_id, v_expires
   FROM qr_tokens WHERE token = p_token;
-  IF v_event_id IS NULL THEN RAISE EXCEPTION 'QR code tidak valid';
-  END IF;
-  IF now() > v_expires THEN RAISE EXCEPTION 'QR code sudah kedaluwarsa';
-  END IF;
-  INSERT INTO attendances (event_id, member_id, status)
-  VALUES (v_event_id, p_member_id, 'hadir')
-  ON CONFLICT (event_id, member_id) DO UPDATE SET status = 'hadir';
+  IF v_event_id IS NULL THEN RAISE EXCEPTION 'QR code tidak valid'; END IF;
+  IF now() > v_expires THEN RAISE EXCEPTION 'QR code sudah kedaluwarsa'; END IF;
+  INSERT INTO attendances (event_id, member_id, status, verified_status)
+  VALUES (v_event_id, p_member_id, 'hadir', 'manual')
+  ON CONFLICT (event_id, member_id) DO UPDATE SET status = 'hadir', verified_status = 'manual';
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.scan_qr_attendance(text, uuid) TO anon;
+
+-- ============================================================
+-- VERIFIKASI WAJAH (face-api.js)
+-- ============================================================
+
+-- Anggota daftar wajah sendiri → status pending
+CREATE OR REPLACE FUNCTION public.enroll_face(
+  p_member_id uuid,
+  p_descriptor jsonb,
+  p_selfie_url text DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  UPDATE members
+     SET face_descriptor = p_descriptor,
+         face_status = 'pending',
+         face_enrolled_at = now(),
+         face_selfie_url = p_selfie_url
+   WHERE id = p_member_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.enroll_face(uuid, jsonb, text) TO anon;
+
+-- Ketua approve/tolak wajah
+CREATE OR REPLACE FUNCTION public.admin_approve_face(
+  p_pin text,
+  p_member_id uuid,
+  p_approve boolean DEFAULT true
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  UPDATE members
+     SET face_status = CASE WHEN p_approve THEN 'approved' ELSE 'none' END,
+         face_descriptor = CASE WHEN p_approve THEN face_descriptor ELSE null END
+   WHERE id = p_member_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_approve_face(text, uuid, boolean) TO anon;
+
+-- Ambil descriptor SATU anggota yang sudah approved (untuk dicocokkan)
+CREATE OR REPLACE FUNCTION public.get_member_descriptor(p_member_id uuid)
+RETURNS jsonb LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT face_descriptor FROM members
+  WHERE id = p_member_id AND face_status = 'approved';
+$$;
+GRANT EXECUTE ON FUNCTION public.get_member_descriptor(uuid) TO anon;
+
+-- Absen dengan QR + verifikasi wajah + anti device-dobel
+CREATE OR REPLACE FUNCTION public.check_in_with_face(
+  p_event_id uuid,
+  p_token text,
+  p_member_id uuid,
+  p_face_score numeric,
+  p_selfie_url text DEFAULT null,
+  p_device_hash text DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_event_id uuid;
+  v_expires timestamptz;
+  v_face_status text;
+BEGIN
+  SELECT qt.event_id, qt.expires_at INTO v_event_id, v_expires
+  FROM qr_tokens qt WHERE qt.token = p_token;
+
+  IF v_event_id IS NULL OR v_token IS DISTINCT FROM p_token THEN
+    RAISE EXCEPTION 'QR tidak valid';
+  END IF;
+  IF v_expires IS NOT NULL AND now() > v_expires THEN
+    RAISE EXCEPTION 'QR sudah kedaluwarsa';
+  END IF;
+
+  SELECT face_status INTO v_face_status FROM members WHERE id = p_member_id;
+  IF v_face_status <> 'approved' THEN
+    RAISE EXCEPTION 'Wajah belum terdaftar / belum di-approve ketua';
+  END IF;
+  IF p_face_score IS NULL OR p_face_score > 0.5 THEN
+    RAISE EXCEPTION 'Wajah tidak cocok';
+  END IF;
+
+  INSERT INTO attendances (
+    event_id, member_id, status, selfie_url, device_hash,
+    face_match_score, verified_status, submitted_at
+  )
+  VALUES (
+    p_event_id, p_member_id, 'hadir', p_selfie_url, p_device_hash,
+    p_face_score, 'auto', now()
+  )
+  ON CONFLICT (event_id, member_id) DO NOTHING;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.check_in_with_face(
+  uuid, text, uuid, numeric, text, text
+) TO anon;
+
+-- Ketua tandai hadir manual saat wajah gagal dikenali
+CREATE OR REPLACE FUNCTION public.admin_mark_manual_attendance(
+  p_pin text,
+  p_event_id uuid,
+  p_member_id uuid,
+  p_note text DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  INSERT INTO attendances (event_id, member_id, status, note, verified_status)
+  VALUES (p_event_id, p_member_id, 'hadir', p_note, 'manual')
+  ON CONFLICT (event_id, member_id)
+  DO UPDATE SET status = 'hadir', note = EXCLUDED.note, verified_status = 'manual';
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_mark_manual_attendance(text, uuid, uuid, text) TO anon;
+
+-- ============================================================
+-- IMPORT DATA REKAP LAMA (bulk backfill)
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.import_attendances(
+  p_pin text,
+  p_event_id uuid,
+  p_rows jsonb
+)
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_count int := 0;
+  r jsonb;
+  v_member_id uuid;
+  v_status text;
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+
+  FOR r IN SELECT * FROM jsonb_array_elements(p_rows)
+  LOOP
+    v_status := lower(r->>'status');
+    IF v_status NOT IN ('hadir','izin','alfa') THEN CONTINUE; END IF;
+
+    SELECT id INTO v_member_id FROM members
+    WHERE lower(name) = lower(r->>'name')
+    LIMIT 1;
+
+    IF v_member_id IS NULL THEN CONTINUE; END IF;
+
+    INSERT INTO attendances (event_id, member_id, status, note, verified_status)
+    VALUES (
+      p_event_id,
+      v_member_id,
+      v_status,
+      r->>'note',
+      'manual'
+    )
+    ON CONFLICT (event_id, member_id)
+    DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, verified_status = 'manual';
+
+    v_count := v_count + 1;
+  END LOOP;
+
+  RETURN v_count;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.import_attendances(text, uuid, jsonb) TO anon;
 
 -- ============================================
 -- ADMIN PIN (default: 1234)

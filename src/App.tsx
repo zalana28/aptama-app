@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AdminProvider } from './hooks/useAdmin'
+import { AdminProvider } from './hooks/AdminProvider'
 import { Navbar } from './components/Navbar'
 import { AdminGate } from './components/AdminGate'
 import { Logo } from './components/Logo'
@@ -14,6 +14,9 @@ import { AjukanIzin } from './pages/AjukanIzin'
 import { SelfCheckIn } from './pages/SelfCheckIn'
 import { GenerateQR } from './pages/GenerateQR'
 import { ScanPage } from './pages/ScanPage'
+import { EnrollFace } from './pages/EnrollFace'
+import { FaceApproval } from './pages/FaceApproval'
+import { ImportData } from './pages/ImportData'
 
 const queryClient = new QueryClient()
 
@@ -57,6 +60,9 @@ function App() {
                 <Route path="/izin" element={<AjukanIzin />} />
                 <Route path="/checkin" element={<SelfCheckIn />} />
                 <Route path="/scan" element={<ScanPage />} />
+                <Route path="/daftar-wajah" element={<EnrollFace />} />
+                <Route path="/verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
+                <Route path="/import" element={<AdminGate><ImportData /></AdminGate>} />
               </Routes>
             </main>
           </div>

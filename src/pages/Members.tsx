@@ -1,10 +1,25 @@
 import { useState } from 'react'
 import { useMembers, useAddMember, useUpdateMember, useDeleteMember } from '../hooks/useMembers'
+import { Link } from 'react-router-dom'
 import type { Member } from '../types'
 
 type FormData = { name: string; group: string; phone: string }
 
 const emptyForm: FormData = { name: '', group: '', phone: '' }
+
+function FaceStatusBadge({ status }: { status?: Member['face_status'] }) {
+  const map: Record<string, { label: string; className: string }> = {
+    approved: { label: '✓ Wajah', className: 'text-success' },
+    pending: { label: '⏳ Wajah', className: 'text-warning' },
+    none: { label: '✕ Wajah', className: 'text-text-muted' },
+  }
+  const cfg = map[status ?? 'none']
+  return (
+    <Link to="/daftar-wajah" className={`text-xs hover:underline ${cfg.className}`}>
+      {cfg.label}
+    </Link>
+  )
+}
 
 export function Members() {
   const { data: members, isLoading } = useMembers()
@@ -128,11 +143,15 @@ export function Members() {
             >
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{m.name}</p>
+                <p className="text-text-muted text-xs truncate">
+                  {m.group && <span>{m.group}</span>}
+                  {m.group && m.phone && <span> · </span>}
+                  {m.phone && <span>{m.phone}</span>}
+                  {!m.group && !m.phone && <FaceStatusBadge status={m.face_status} />}
+                </p>
                 {(m.group || m.phone) && (
-                  <p className="text-text-muted text-xs truncate">
-                    {m.group && <span>{m.group}</span>}
-                    {m.group && m.phone && <span> · </span>}
-                    {m.phone && <span>{m.phone}</span>}
+                  <p className="text-text-muted text-xs truncate mt-0.5">
+                    <FaceStatusBadge status={m.face_status} />
                   </p>
                 )}
               </div>

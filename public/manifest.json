@@ -1,0 +1,31 @@
+{
+  "name": "APTAMA Absensi",
+  "short_name": "APTAMA",
+  "description": "Aplikasi Absensi Angkatan Pucanganom Tiga Muda — Kegiatan Bersih Sampah",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0F0D",
+  "theme_color": "#1B7A3D",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/logos/aptama-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logos/aptama-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

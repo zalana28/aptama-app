@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { LogIn, FileText, BarChart3, QrCode, KeyRound, Clock } from 'lucide-react'
+import { LogIn, FileText, BarChart3, QrCode, KeyRound, Clock, ScanFace, ShieldCheck, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { Logo } from '../components/Logo'
 import { Card } from '../components/ui/Card'
@@ -130,8 +130,36 @@ export function Home() {
             <p className="text-sm font-semibold">Ajukan Izin</p>
             <p className="text-[10px] text-text-muted mt-0.5">Alasan privat</p>
           </Card>
-        </Link>
-      </motion.div>
+          </Link>
+        </motion.div>
+
+        {/* ---- Face & Import ---- */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.45 }}
+          className="grid grid-cols-2 gap-3"
+        >
+          <Link to="/daftar-wajah">
+            <Card className="text-center group" glow="green">
+              <div className="inline-flex p-3 rounded-2xl bg-primary/15 mb-2 group-hover:bg-primary/25 transition">
+                <ScanFace size={24} className="text-primary" />
+              </div>
+              <p className="text-sm font-semibold">Daftar Wajah</p>
+              <p className="text-[10px] text-text-muted mt-0.5">Untuk absen QR</p>
+            </Card>
+          </Link>
+
+          <Link to={isAdmin ? '/verifikasi-wajah' : '#'} onClick={(e) => { if (!isAdmin) e.preventDefault() }}>
+            <Card className={`text-center group ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`} glow="gold">
+              <div className="inline-flex p-3 rounded-2xl bg-secondary/15 mb-2 group-hover:bg-secondary/25 transition">
+                <ShieldCheck size={24} className="text-secondary" />
+              </div>
+              <p className="text-sm font-semibold">Approve Wajah</p>
+              <p className="text-[10px] text-text-muted mt-0.5">{isAdmin ? 'Mode ketua' : 'Butuh Mode Ketua'}</p>
+            </Card>
+          </Link>
+        </motion.div>
 
       {/* ---- Quick Stats ---- */}
       {latestEvent && totalMembers > 0 && (
@@ -180,6 +208,19 @@ export function Home() {
             <div className="flex-1">
               <p className="text-sm font-medium">QR Absen</p>
               <p className="text-[10px] text-text-muted">{isAdmin ? 'Generate QR code untuk kegiatan' : 'Butuh Mode Ketua'}</p>
+            </div>
+            {!isAdmin && <div className="text-text-muted/40"><KeyRound size={14} /></div>}
+          </Card>
+        </Link>
+
+        <Link to={isAdmin ? '/import' : '#'} onClick={(e) => { if (!isAdmin) e.preventDefault() }}>
+          <Card className={`flex items-center gap-3 group ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            <div className="p-2.5 rounded-xl bg-white/5 group-hover:bg-primary/15 transition">
+              <Upload size={18} className="text-text-secondary group-hover:text-primary transition" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Import Rekap Lama</p>
+              <p className="text-[10px] text-text-muted">{isAdmin ? 'Bulk backfill data lama' : 'Butuh Mode Ketua'}</p>
             </div>
             {!isAdmin && <div className="text-text-muted/40"><KeyRound size={14} /></div>}
           </Card>

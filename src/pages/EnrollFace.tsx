@@ -94,8 +94,15 @@ export function EnrollFace() {
       const filePath = `face-enroll/${memberId}/${Date.now()}.jpg`
       console.log('selfie path:', filePath)
 
-      const uploadedPath = await uploadSelfie(supabase, selfieBlob, filePath)
-      console.log('uploaded path:', uploadedPath)
+      let uploadedPath: string
+      try {
+        uploadedPath = await uploadSelfie(supabase, selfieBlob, filePath)
+        console.log('uploaded path:', uploadedPath)
+      } catch (uploadErr: any) {
+        console.error('Upload selfie gagal:', uploadErr)
+        setError('Gagal upload selfie: ' + (uploadErr?.message ?? 'cek Storage RLS / bucket'))
+        return
+      }
 
       const { error: rpcError } = await supabase.rpc('enroll_face', {
         p_member_id: memberId,
@@ -105,7 +112,7 @@ export function EnrollFace() {
 
       if (rpcError) {
         console.error('RPC enroll_face gagal:', rpcError)
-        setError(rpcError.message || 'Gagal menyimpan data wajah.')
+        setError('Gagal menyimpan data wajah: ' + (rpcError.message || 'RPC error'))
         return
       }
 

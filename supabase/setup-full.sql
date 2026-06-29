@@ -171,11 +171,23 @@ insert into storage.buckets (id, name, public)
 values ('selfies', 'selfies', false)
 on conflict (id) do nothing;
 
--- Anon boleh upload selfie saat enroll/absen
+-- Pastikan RLS aktif di storage.objects
+alter table storage.objects enable row level security;
+
+-- Hapus policy lama yang mungkin bentrok
 DROP POLICY IF EXISTS "anon upload selfie" ON storage.objects;
+DROP POLICY IF EXISTS "public_upload_selfies" ON storage.objects;
+
+-- Anon boleh upload selfie saat enroll/absen
 CREATE POLICY "anon upload selfie"
-  ON storage.objects FOR INSERT TO anon
+  ON storage.objects FOR INSERT TO anon, authenticated
   WITH CHECK (bucket_id = 'selfies');
+
+-- Ketua bisa membaca selfie (via signed URL)
+DROP POLICY IF EXISTS "admin read selfies" ON storage.objects;
+CREATE POLICY "admin read selfies"
+  ON storage.objects FOR SELECT TO anon, authenticated
+  USING (bucket_id = 'selfies');
 
 -- ============================================
 -- RPC FUNCTIONS

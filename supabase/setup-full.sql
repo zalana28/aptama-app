@@ -178,7 +178,7 @@ on conflict (id) do nothing;
 -- Hapus policy lama yang mungkin bentrok
 DROP POLICY IF EXISTS "anon upload selfie" ON storage.objects;
 DROP POLICY IF EXISTS "public_upload_selfies" ON storage.objects;
-DROP POLICY IF EXISTS "admin_read_selfies" ON storage.objects;
+DROP POLICY IF EXISTS "admin read selfies" ON storage.objects;
 
 -- Anon boleh upload selfie saat enroll/absen
 CREATE POLICY "anon upload selfie"

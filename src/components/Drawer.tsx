@@ -59,6 +59,10 @@ export function Drawer({ open, onClose }: DrawerProps) {
 
           {/* Drawer panel */}
           <motion.div
+            id="main-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu navigasi"
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
@@ -75,13 +79,14 @@ export function Drawer({ open, onClose }: DrawerProps) {
                 whileTap={{ scale: 0.9 }}
                 onClick={onClose}
                 className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition"
+                aria-label="Tutup menu"
               >
                 <X size={18} className="text-text-secondary" />
               </motion.button>
             </div>
 
             {/* Menu items */}
-            <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5">
+            <nav className="flex-1 overflow-y-auto py-3 px-3 space-y-0.5" aria-label="Menu utama">
               <p className="text-[10px] uppercase tracking-wider text-text-muted font-semibold px-3 py-2">Menu</p>
               {publicLinks.map((link) => {
                 const Icon = link.icon

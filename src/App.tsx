@@ -17,6 +17,7 @@ import { ScanPage } from './pages/ScanPage'
 import { EnrollFace } from './pages/EnrollFace'
 import { FaceApproval } from './pages/FaceApproval'
 import { ImportData } from './pages/ImportData'
+import { ChangePin } from './pages/ChangePin'
 
 const queryClient = new QueryClient()
 
@@ -63,6 +64,7 @@ function App() {
                 <Route path="/daftar-wajah" element={<EnrollFace />} />
                 <Route path="/verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
                 <Route path="/import" element={<AdminGate><ImportData /></AdminGate>} />
+                <Route path="/ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
               </Routes>
             </main>
           </div>

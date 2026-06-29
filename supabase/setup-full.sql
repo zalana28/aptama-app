@@ -23,6 +23,22 @@ CREATE TABLE IF NOT EXISTS members (
   created_at timestamptz DEFAULT now()
 );
 
+-- Tambah kolom wajah jika tabel members sudah ada sebelumnya
+ALTER TABLE members ADD COLUMN IF NOT EXISTS face_descriptor jsonb;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS face_status text DEFAULT 'none';
+ALTER TABLE members ADD COLUMN IF NOT EXISTS face_enrolled_at timestamptz;
+ALTER TABLE members ADD COLUMN IF NOT EXISTS face_selfie_url text;
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'members_face_status_check'
+  ) THEN
+    ALTER TABLE members ADD CONSTRAINT members_face_status_check
+      CHECK (face_status IN ('none', 'pending', 'approved'));
+  END IF;
+END;
+$$;
+
 CREATE TABLE IF NOT EXISTS events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
@@ -46,6 +62,23 @@ CREATE TABLE IF NOT EXISTS attendances (
   submitted_at timestamptz DEFAULT now(),
   UNIQUE (event_id, member_id)
 );
+
+-- Tambah kolom wajah/anti-cheat jika tabel attendances sudah ada sebelumnya
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS selfie_url text;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS device_hash text;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS face_match_score numeric;
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS verified_status text DEFAULT 'auto';
+ALTER TABLE attendances ADD COLUMN IF NOT EXISTS submitted_at timestamptz DEFAULT now();
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'attendances_verified_status_check'
+  ) THEN
+    ALTER TABLE attendances ADD CONSTRAINT attendances_verified_status_check
+      CHECK (verified_status IN ('auto', 'manual', 'pending'));
+  END IF;
+END;
+$$;
 
 -- 1 device hanya boleh 1x submit per kegiatan
 CREATE UNIQUE INDEX IF NOT EXISTS uq_attendance_device

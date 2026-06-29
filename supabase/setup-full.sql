@@ -262,19 +262,45 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
 
--- Ganti PIN
-CREATE OR REPLACE FUNCTION public.admin_change_pin(p_old_pin text, p_new_pin text)
+-- Ganti PIN + recovery PIN
+CREATE OR REPLACE FUNCTION public.admin_change_pin(
+  p_old_pin text,
+  p_new_pin text,
+  p_recovery_pin text DEFAULT null
+)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE v_hash text;
 BEGIN
   SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
-  IF v_hash <> encode(digest(p_old_pin, 'sha256'), 'hex') THEN
+  IF v_hash IS DISTINCT FROM encode(digest(p_old_pin, 'sha256'), 'hex') THEN
     RAISE EXCEPTION 'PIN lama salah';
+  END IF;
+  UPDATE admin_config SET value = encode(digest(p_new_pin, 'sha256'), 'hex') WHERE key = 'pin_hash';
+  IF p_recovery_pin IS NOT NULL AND length(trim(p_recovery_pin)) > 0 THEN
+    INSERT INTO admin_config (key, value)
+    VALUES ('recovery_pin_hash', encode(digest(p_recovery_pin, 'sha256'), 'hex'))
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  END IF;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_change_pin(text, text, text) TO anon;
+
+-- Reset PIN pakai recovery PIN
+CREATE OR REPLACE FUNCTION public.admin_reset_pin(
+  p_recovery_pin text,
+  p_new_pin text
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_hash text;
+BEGIN
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'recovery_pin_hash';
+  IF v_hash IS DISTINCT FROM encode(digest(p_recovery_pin, 'sha256'), 'hex') THEN
+    RAISE EXCEPTION 'Recovery PIN salah';
   END IF;
   UPDATE admin_config SET value = encode(digest(p_new_pin, 'sha256'), 'hex') WHERE key = 'pin_hash';
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.admin_change_pin(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.admin_reset_pin(text, text) TO anon;
 
 -- Generate QR token
 CREATE OR REPLACE FUNCTION public.generate_qr_token(
@@ -483,6 +509,10 @@ GRANT EXECUTE ON FUNCTION public.import_attendances(text, uuid, jsonb) TO anon;
 
 INSERT INTO admin_config (key, value)
 VALUES ('pin_hash', encode(digest('1234', 'sha256'), 'hex'))
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO admin_config (key, value)
+VALUES ('recovery_pin_hash', encode(digest('123456', 'sha256'), 'hex'))
 ON CONFLICT (key) DO NOTHING;
 
 -- ============================================

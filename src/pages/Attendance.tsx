@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useEvents } from '../hooks/useEvents'
 import { useMembers } from '../hooks/useMembers'
 import { useAttendanceByEvent, useAdminAttendanceByEvent, useUpsertAttendance } from '../hooks/useAttendance'
 import { useAdmin } from '../hooks/useAdmin'
+import { supabase } from '../lib/supabase'
 import type { AttendanceStatus } from '../types'
 
 const statusConfig: Record<AttendanceStatus, { label: string; color: string; bg: string }> = {
@@ -34,6 +36,7 @@ function StatusButton({
 }
 
 export function Attendance() {
+  const qc = useQueryClient()
   const { data: events } = useEvents()
   const { data: members } = useMembers()
   const { isAdmin } = useAdmin()
@@ -44,6 +47,7 @@ export function Attendance() {
   const { data: adminRows } = useAdminAttendanceByEvent(selectedEvent)
   const attendanceRows = isAdmin ? adminRows : publicRows
   const upsert = useUpsertAttendance()
+  const [liveIds, setLiveIds] = useState<Set<string>>(new Set())
   const [noteModal, setNoteModal] = useState<{ memberId: string; memberName: string } | null>(null)
   const [noteText, setNoteText] = useState('')
 
@@ -75,6 +79,46 @@ export function Attendance() {
     setNoteModal(null)
     setNoteText('')
   }
+
+  // Realtime monitoring: refresh data absensi saat ada check-in baru
+  useEffect(() => {
+    if (!selectedEvent) return
+    setLiveIds(new Set())
+
+    const channel = supabase
+      .channel(`attendance-${selectedEvent}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'attendances',
+          filter: `event_id=eq.${selectedEvent}`,
+        },
+        (payload) => {
+          const memberId =
+            payload.eventType === 'DELETE'
+              ? (payload.old as { member_id?: string })?.member_id
+              : (payload.new as { member_id?: string })?.member_id
+          if (memberId) {
+            setLiveIds((prev) => new Set(prev).add(memberId))
+            setTimeout(() => {
+              setLiveIds((prev) => {
+                const next = new Set(prev)
+                next.delete(memberId)
+                return next
+              })
+            }, 3000)
+          }
+          qc.invalidateQueries({ queryKey: ['attendance', selectedEvent] })
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [selectedEvent, qc])
 
   const selectedEv = events?.find((e) => e.id === selectedEvent)
   const hadir = members?.filter((m) => statusMap.get(m.id) === 'hadir').length ?? 0
@@ -131,11 +175,16 @@ export function Attendance() {
                 key={m.id}
                 className={`bg-bg-card rounded-xl px-4 py-3 border transition ${
                   current ? statusConfig[current].bg : 'border-white/10'
-                }`}
+                } ${liveIds.has(m.id) ? 'ring-2 ring-primary animate-pulse-dot' : ''}`}
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm truncate">{m.name}</p>
+                    <p className="font-medium text-sm truncate flex items-center gap-1.5">
+                      {m.name}
+                      {liveIds.has(m.id) && (
+                        <span className="inline-block w-2 h-2 rounded-full bg-primary" />
+                      )}
+                    </p>
                     {noteMap.has(m.id) && (
                       <p className="text-text-muted text-xs truncate mt-0.5">
                         📝 {noteMap.get(m.id)}

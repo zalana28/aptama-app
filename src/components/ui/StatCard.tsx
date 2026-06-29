@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 interface StatCardProps {
   label: string
   value: number | string
-  color: 'green' | 'gold' | 'red' | 'white'
+  color: 'green' | 'gold' | 'red' | 'white' | 'blue' | 'purple'
   icon?: React.ReactNode
   delay?: number
 }
@@ -14,6 +14,8 @@ const colorMap = {
   gold: 'text-secondary',
   red: 'text-danger',
   white: 'text-white',
+  blue: 'text-blue-400',
+  purple: 'text-purple-400',
 }
 
 export function StatCard({ label, value, color, icon, delay = 0 }: StatCardProps) {

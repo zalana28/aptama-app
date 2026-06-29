@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import * as XLSX from 'xlsx'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 import { useMembers } from '../hooks/useMembers'
 import { useEvents } from '../hooks/useEvents'
 import { useAttendanceByEvent, useAdminAttendanceByEvent } from '../hooks/useAttendance'
@@ -52,6 +55,45 @@ function exportCsv(baris: { name: string; group: string; status: string }[]) {
   URL.revokeObjectURL(url)
 }
 
+function exportExcel(
+  judul: string,
+  tanggal: string,
+  baris: { name: string; group: string; status: string }[]
+) {
+  const rows = baris.map((r, i) => ({
+    No: i + 1,
+    Nama: r.name,
+    'RT/RW': r.group,
+    Status: r.status,
+  }))
+  const ws = XLSX.utils.json_to_sheet(rows)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap')
+  XLSX.writeFile(wb, `rekap-${judul}-${tanggal}.xlsx`)
+}
+
+function exportPdf(
+  judul: string,
+  tanggal: string,
+  baris: { name: string; group: string; status: string }[]
+) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  doc.setFontSize(14)
+  doc.text(`Rekap Absensi APTAMA`, 14, 16)
+  doc.setFontSize(11)
+  doc.text(`${judul} — ${tanggal}`, 14, 24)
+
+  autoTable(doc, {
+    startY: 32,
+    head: [['No', 'Nama', 'RT/RW', 'Status']],
+    body: baris.map((r, i) => [i + 1, r.name, r.group, r.status]),
+    styles: { fontSize: 10 },
+    headStyles: { fillColor: [27, 122, 61] },
+  })
+
+  doc.save(`rekap-${judul}-${tanggal}.pdf`)
+}
+
 export function Recap() {
   const { data: events } = useEvents()
   const { data: members } = useMembers()
@@ -94,14 +136,27 @@ export function Recap() {
     shareKeWhatsApp(teks)
   }
 
-  function handleExport() {
-    if (!members) return
-    const baris = members.map((m) => ({
+  function getExportRows() {
+    if (!members) return []
+    return members.map((m) => ({
       name: m.name,
       group: m.group ?? '-',
       status: statusMap.get(m.id) ?? 'alfa',
     }))
-    exportCsv(baris)
+  }
+
+  function handleExportCsv() {
+    exportCsv(getExportRows())
+  }
+
+  function handleExportExcel() {
+    if (!selectedEv) return
+    exportExcel(selectedEv.title, selectedEv.date, getExportRows())
+  }
+
+  function handleExportPdf() {
+    if (!selectedEv) return
+    exportPdf(selectedEv.title, selectedEv.date, getExportRows())
   }
 
   return (
@@ -174,18 +229,30 @@ export function Recap() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2 pt-2">
+          <div className="grid grid-cols-2 gap-2 pt-2">
             <button
               onClick={handleShare}
-              className="flex-1 bg-[#25D366] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1eba57] transition"
+              className="bg-[#25D366] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1eba57] transition"
             >
               📱 Share ke WhatsApp
             </button>
             <button
-              onClick={handleExport}
-              className="flex-1 bg-secondary text-bg px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary-light transition"
+              onClick={handleExportCsv}
+              className="bg-secondary text-bg px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary-light transition"
             >
-              📥 Unduh CSV
+              📄 CSV
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition"
+            >
+              📊 Excel
+            </button>
+            <button
+              onClick={handleExportPdf}
+              className="bg-danger text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-red-600 transition"
+            >
+              🧾 PDF
             </button>
           </div>
         </>

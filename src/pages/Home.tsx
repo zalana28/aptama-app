@@ -30,6 +30,15 @@ export function Home() {
   const izin = attendance?.filter((a) => a.status === 'izin').length ?? 0
   const alfa = totalMembers - hadir - izin
 
+  // Dashboard ringkasan ketua
+  const totalEvents = events?.length ?? 0
+  const pendingFaces = members?.filter((m) => m.face_status === 'pending').length ?? 0
+  const noFaces = members?.filter((m) => m.face_status === 'none').length ?? 0
+  const avgAttendance =
+    latestEvent && totalMembers > 0
+      ? Math.round((hadir / totalMembers) * 100)
+      : 0
+
   return (
     <div className="max-w-lg mx-auto px-4 pb-8 space-y-6">
       {/* ---- Hero ---- */}
@@ -161,6 +170,44 @@ export function Home() {
             </Card>
           </Link>
         </motion.div>
+
+      {/* ---- Dashboard Ringkasan Ketua ---- */}
+      {isAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.48 }}
+        >
+          <p className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-2">
+            📊 Ringkasan Ketua
+          </p>
+          <div className="grid grid-cols-2 gap-2.5">
+            <StatCard label="Total Anggota" value={totalMembers} color="blue" delay={0.5} />
+            <StatCard label="Total Kegiatan" value={totalEvents} color="purple" delay={0.52} />
+            <StatCard label="Wajah Pending" value={pendingFaces} color="gold" delay={0.54} />
+            <StatCard label="Belum Daftar Wajah" value={noFaces} color="red" delay={0.56} />
+          </div>
+          <div className="mt-2.5 bg-bg-card rounded-xl p-3 border border-white/10">
+            <div className="flex items-center justify-between text-xs text-text-muted mb-1">
+              <span>Kehadiran Terakhir</span>
+              <span className="font-medium text-text">{avgAttendance}%</span>
+            </div>
+            <div className="w-full bg-white/10 rounded-full h-2">
+              <div
+                className="bg-success rounded-full h-2 transition-all"
+                style={{ width: `${avgAttendance}%` }}
+              />
+            </div>
+          </div>
+          {pendingFaces > 0 && (
+            <Link to="/verifikasi-wajah">
+              <div className="mt-2.5 bg-warning/10 border border-warning/30 rounded-xl p-3 text-warning text-xs font-medium hover:bg-warning/15 transition">
+                ⚠️ Ada {pendingFaces} wajah menunggu approve. Klik di sini.
+              </div>
+            </Link>
+          )}
+        </motion.div>
+      )}
 
       {/* ---- Quick Stats ---- */}
       {latestEvent && totalMembers > 0 && (

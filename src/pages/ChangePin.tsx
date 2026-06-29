@@ -7,6 +7,7 @@ export function ChangePin() {
   const [oldPin, setOldPin] = useState('')
   const [newPin, setNewPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
+  const [recoveryPin, setRecoveryPin] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
@@ -17,7 +18,7 @@ export function ChangePin() {
     setSuccess(false)
 
     if (!oldPin || !newPin || !confirmPin) {
-      setError('Semua field wajib diisi.')
+      setError('PIN lama, PIN baru, dan konfirmasi PIN wajib diisi.')
       return
     }
     if (newPin !== confirmPin) {
@@ -35,6 +36,7 @@ export function ChangePin() {
       const { error: rpcError } = await supabase.rpc('admin_change_pin', {
         p_old_pin: oldPin,
         p_new_pin: newPin,
+        p_recovery_pin: recoveryPin.trim() || null,
       })
 
       if (rpcError) {
@@ -50,6 +52,7 @@ export function ChangePin() {
       setOldPin('')
       setNewPin('')
       setConfirmPin('')
+      setRecoveryPin('')
     } catch (err: any) {
       console.error('Gagal ganti PIN:', err)
       setError('Gagal mengganti PIN: ' + (err?.message ?? 'error tidak diketahui'))
@@ -72,7 +75,7 @@ export function ChangePin() {
         <div className="text-4xl">🔐</div>
         <h1 className="text-xl font-bold">Ganti PIN Ketua</h1>
         <p className="text-text-muted text-sm">
-          Ubah PIN akses Mode Ketua. PIN baru akan langsung aktif.
+          Ubah PIN akses Mode Ketua. Isi Recovery PIN untuk bisa reset PIN kalau lupa.
         </p>
       </div>
 
@@ -127,6 +130,23 @@ export function ChangePin() {
             onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
           />
+        </div>
+
+        <div className="pt-2 border-t border-white/10">
+          <label className="text-xs text-text-muted mb-1 block">Recovery PIN (opsional)</label>
+          <input
+            type="password"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={6}
+            placeholder="Atur recovery PIN"
+            value={recoveryPin}
+            onChange={(e) => setRecoveryPin(e.target.value.replace(/\D/g, ''))}
+            className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
+          />
+          <p className="text-[10px] text-text-muted mt-1">
+            Recovery PIN dipakai kalau ketua lupa PIN. Default: 123456.
+          </p>
         </div>
 
         {error && <p className="text-danger text-sm text-center">{error}</p>}

@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { AnimatePresence, motion } from 'framer-motion'
 import { AdminProvider } from './hooks/AdminProvider'
 import { Navbar } from './components/Navbar'
 import { AdminGate } from './components/AdminGate'
@@ -18,8 +20,10 @@ import { EnrollFace } from './pages/EnrollFace'
 import { FaceApproval } from './pages/FaceApproval'
 import { ImportData } from './pages/ImportData'
 import { ChangePin } from './pages/ChangePin'
+import { SplashScreen } from './components/SplashScreen'
 
 const queryClient = new QueryClient()
+const SPLASH_DURATION_MS = 1800
 
 function SetupNotice() {
   return (
@@ -35,41 +39,70 @@ function SetupNotice() {
   )
 }
 
-function App() {
+function useSplash() {
+  const [showSplash, setShowSplash] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowSplash(false), SPLASH_DURATION_MS)
+    return () => clearTimeout(timer)
+  }, [])
+
+  return showSplash
+}
+
+function MainApp() {
   if (!isConfigured) {
     return (
-      <QueryClientProvider client={queryClient}>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4 }}
+      >
         <SetupNotice />
-      </QueryClientProvider>
+      </motion.div>
     )
   }
 
   return (
+    <AdminProvider>
+      <BrowserRouter>
+        <div className="min-h-screen bg-bg">
+          <Navbar />
+          <main className="animate-fade-in">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/anggota" element={<AdminGate><Members /></AdminGate>} />
+              <Route path="/kegiatan" element={<AdminGate><Events /></AdminGate>} />
+              <Route path="/absensi" element={<AdminGate><Attendance /></AdminGate>} />
+              <Route path="/generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
+              <Route path="/rekap" element={<Recap />} />
+              <Route path="/izin" element={<AjukanIzin />} />
+              <Route path="/checkin" element={<SelfCheckIn />} />
+              <Route path="/scan" element={<ScanPage />} />
+              <Route path="/daftar-wajah" element={<EnrollFace />} />
+              <Route path="/verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
+              <Route path="/import" element={<AdminGate><ImportData /></AdminGate>} />
+              <Route path="/ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
+            </Routes>
+          </main>
+        </div>
+      </BrowserRouter>
+    </AdminProvider>
+  )
+}
+
+function App() {
+  const showSplash = useSplash()
+
+  return (
     <QueryClientProvider client={queryClient}>
-      <AdminProvider>
-        <BrowserRouter>
-          <div className="min-h-screen bg-bg">
-            <Navbar />
-            <main className="animate-fade-in">
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/anggota" element={<AdminGate><Members /></AdminGate>} />
-                <Route path="/kegiatan" element={<AdminGate><Events /></AdminGate>} />
-                <Route path="/absensi" element={<AdminGate><Attendance /></AdminGate>} />
-                <Route path="/generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
-                <Route path="/rekap" element={<Recap />} />
-                <Route path="/izin" element={<AjukanIzin />} />
-                <Route path="/checkin" element={<SelfCheckIn />} />
-                <Route path="/scan" element={<ScanPage />} />
-                <Route path="/daftar-wajah" element={<EnrollFace />} />
-                <Route path="/verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
-                <Route path="/import" element={<AdminGate><ImportData /></AdminGate>} />
-                <Route path="/ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
-              </Routes>
-            </main>
-          </div>
-        </BrowserRouter>
-      </AdminProvider>
+      <AnimatePresence mode="wait">
+        {showSplash ? (
+          <SplashScreen key="splash" />
+        ) : (
+          <MainApp key="main" />
+        )}
+      </AnimatePresence>
     </QueryClientProvider>
   )
 }

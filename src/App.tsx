@@ -23,7 +23,7 @@ import { ChangePin } from './pages/ChangePin'
 import { SplashScreen } from './components/SplashScreen'
 
 const queryClient = new QueryClient()
-const SPLASH_DURATION_MS = 1800
+const SPLASH_DURATION_MS = 3000
 
 function SetupNotice() {
   return (

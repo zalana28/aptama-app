@@ -22,13 +22,18 @@ export function AjukanIzin() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!memberId || !eventId) return
+    const trimmedReason = reason.trim()
+    if (!trimmedReason) {
+      setError('Alasan izin wajib diisi.')
+      return
+    }
     setError('')
     setLoading(true)
 
     const { error: rpcError } = await supabase.rpc('submit_izin', {
       p_event_id: eventId,
       p_member_id: memberId,
-      p_reason: reason.trim() || '-',
+      p_reason: trimmedReason,
     })
 
     setLoading(false)
@@ -99,16 +104,17 @@ export function AjukanIzin() {
         </div>
 
         <div>
-          <label className="text-xs text-text-muted mb-1 block">Alasan Izin</label>
+          <label className="text-xs text-text-muted mb-1 block">Alasan Izin <span className="text-danger">*</span></label>
           <textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Tulis alasan izin..."
             rows={3}
+            required
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           <p className="text-xs text-text-muted mt-1">
-            🔒 Alasan ini hanya bisa dilihat oleh ketua. Privasimu aman.
+            🔒 Alasan ini hanya bisa dilihat oleh ketua. Privasimu aman. <span className="text-warning">Wajib diisi.</span>
           </p>
         </div>
 

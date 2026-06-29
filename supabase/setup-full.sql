@@ -66,6 +66,37 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================
+-- RLS + GRANTS + POLICIES (client-side CRUD)
+-- Threat model: internal/community use, Ketua-only mutation
+-- via UI gate (PIN). RLS off + permissive policies fallback
+-- supaya tetap jalan walaupun Supabase force-enable RLS.
+-- For production-grade security, replace with RLS policies
+-- + SECURITY DEFINER RPCs.
+-- ============================================
+ALTER TABLE members DISABLE ROW LEVEL SECURITY;
+ALTER TABLE events DISABLE ROW LEVEL SECURITY;
+ALTER TABLE attendances DISABLE ROW LEVEL SECURITY;
+ALTER TABLE qr_tokens DISABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_config DISABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "anon_all_members" ON members;
+DROP POLICY IF EXISTS "anon_all_events" ON events;
+DROP POLICY IF EXISTS "anon_all_attendances" ON attendances;
+DROP POLICY IF EXISTS "anon_all_qr_tokens" ON qr_tokens;
+DROP POLICY IF EXISTS "anon_all_admin_config" ON admin_config;
+
+CREATE POLICY "anon_all_members" ON members FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_events" ON events FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_attendances" ON attendances FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_qr_tokens" ON qr_tokens FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_admin_config" ON admin_config FOR ALL TO anon USING (true) WITH CHECK (true);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON members TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON events TO anon;
+-- attendances: no SELECT grant (privasi — view attendance_public tanpa 'note' yang dipakai client)
+GRANT INSERT, UPDATE, DELETE ON attendances TO anon;
+
+-- ============================================
 -- VIEWS (create or replace)
 -- ============================================
 
@@ -125,8 +156,11 @@ CREATE POLICY IF NOT EXISTS "admin_read_selfies"
 CREATE OR REPLACE FUNCTION public.submit_izin(p_event_id uuid, p_member_id uuid, p_reason text)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 BEGIN
+  IF p_reason IS NULL OR length(trim(p_reason)) = 0 THEN
+    RAISE EXCEPTION 'Alasan izin wajib diisi';
+  END IF;
   INSERT INTO attendances (event_id, member_id, status, note)
-  VALUES (p_event_id, p_member_id, 'izin', p_reason)
+  VALUES (p_event_id, p_member_id, 'izin', trim(p_reason))
   ON CONFLICT (event_id, member_id) DO UPDATE SET status = 'izin', note = EXCLUDED.note;
 END;
 $$;
@@ -380,3 +414,30 @@ GRANT EXECUTE ON FUNCTION public.import_attendances(text, uuid, jsonb) TO anon;
 INSERT INTO admin_config (key, value)
 VALUES ('pin_hash', encode(digest('1234', 'sha256'), 'hex'))
 ON CONFLICT (key) DO NOTHING;
+
+-- ============================================
+-- ADMIN: Get attendance WITH notes (alasan izin)
+-- Ketua-only: verify PIN, return rows including `note` column.
+-- ============================================
+CREATE OR REPLACE FUNCTION public.admin_get_attendance(p_event_id uuid, p_pin text)
+RETURNS TABLE (
+  id uuid,
+  event_id uuid,
+  member_id uuid,
+  status text,
+  note text
+)
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_hash text;
+BEGIN
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
+  IF v_hash IS NULL OR v_hash <> encode(digest(p_pin, 'sha256'), 'hex') THEN
+    RAISE EXCEPTION 'PIN salah';
+  END IF;
+  RETURN QUERY
+    SELECT a.id, a.event_id, a.member_id, a.status, a.note
+    FROM attendances a
+    WHERE a.event_id = p_event_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_get_attendance(uuid, text) TO anon;

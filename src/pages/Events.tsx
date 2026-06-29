@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useEvents, useAddEvent, useUpdateEvent, useDeleteEvent } from '../hooks/useEvents'
+import { errorMessage } from '../lib/errors'
 import type { Event } from '../types'
 
 type FormData = { title: string; date: string; location: string }
@@ -29,43 +30,63 @@ export function Events() {
   const [form, setForm] = useState<FormData>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  function clearError() {
+    setErrorMsg('')
+    addEvent.reset()
+    updateEvent.reset()
+    deleteEvent.reset()
+  }
 
   function startEdit(ev: Event) {
     setEditingId(ev.id)
     setForm({ title: ev.title, date: ev.date, location: ev.location ?? '' })
     setShowForm(true)
+    clearError()
   }
 
   function cancelForm() {
     setEditingId(null)
     setForm(emptyForm)
     setShowForm(false)
+    clearError()
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.title.trim() || !form.date) return
+    clearError()
 
-    if (editingId) {
-      await updateEvent.mutateAsync({
-        id: editingId,
-        title: form.title.trim(),
-        date: form.date,
-        location: form.location.trim() || undefined,
-      })
-    } else {
-      await addEvent.mutateAsync({
-        title: form.title.trim(),
-        date: form.date,
-        location: form.location.trim() || undefined,
-      })
+    try {
+      if (editingId) {
+        await updateEvent.mutateAsync({
+          id: editingId,
+          title: form.title.trim(),
+          date: form.date,
+          location: form.location.trim() || undefined,
+        })
+      } else {
+        await addEvent.mutateAsync({
+          title: form.title.trim(),
+          date: form.date,
+          location: form.location.trim() || undefined,
+        })
+      }
+      cancelForm()
+    } catch (err) {
+      setErrorMsg(errorMessage(err, 'Gagal menyimpan kegiatan.'))
     }
-    cancelForm()
   }
 
   async function handleDelete(id: string, title: string) {
     if (!confirm(`Hapus kegiatan "${title}"? Data absensi terkait juga akan terhapus.`)) return
-    await deleteEvent.mutateAsync(id)
+    clearError()
+    try {
+      await deleteEvent.mutateAsync(id)
+    } catch (err) {
+      setErrorMsg(errorMessage(err, 'Gagal menghapus kegiatan.'))
+    }
   }
 
   // Pisahkan upcoming vs lampau
@@ -115,6 +136,20 @@ export function Events() {
             onChange={(e) => setForm({ ...form, location: e.target.value })}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
+          {errorMsg && (
+            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 space-y-1">
+              <p className="text-danger text-xs">⚠️ {errorMsg}</p>
+              <p className="text-text-muted text-[10px]">
+                Diagnostik: jalanin query ini di Supabase SQL Editor untuk cek status RLS:
+              </p>
+              <code className="block bg-bg-input text-text-muted text-[10px] px-2 py-1 rounded font-mono whitespace-pre">
+                SELECT relname, relrowsecurity{'\n'}FROM pg_class{'\n'}WHERE relname IN ('members','events','attendances');
+              </code>
+              <p className="text-text-muted text-[10px]">
+                Kalau relrowsecurity = true, RLS aktif — pastikan setup-full.sql versi terbaru sudah dijalankan.
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"

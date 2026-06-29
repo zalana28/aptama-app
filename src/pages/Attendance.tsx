@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useEvents } from '../hooks/useEvents'
 import { useMembers } from '../hooks/useMembers'
-import { useAttendanceByEvent, useUpsertAttendance } from '../hooks/useAttendance'
+import { useAttendanceByEvent, useAdminAttendanceByEvent, useUpsertAttendance } from '../hooks/useAttendance'
+import { useAdmin } from '../hooks/useAdmin'
 import type { AttendanceStatus } from '../types'
 
 const statusConfig: Record<AttendanceStatus, { label: string; color: string; bg: string }> = {
@@ -35,8 +36,13 @@ function StatusButton({
 export function Attendance() {
   const { data: events } = useEvents()
   const { data: members } = useMembers()
+  const { isAdmin } = useAdmin()
   const [selectedEvent, setSelectedEvent] = useState('')
-  const { data: attendanceRows } = useAttendanceByEvent(selectedEvent)
+  // Ketua: query admin RPC yang include kolom `note` (alasan izin).
+  // Non-ketua: query view publik tanpa `note` (privasi terjaga).
+  const { data: publicRows } = useAttendanceByEvent(selectedEvent)
+  const { data: adminRows } = useAdminAttendanceByEvent(selectedEvent)
+  const attendanceRows = isAdmin ? adminRows : publicRows
   const upsert = useUpsertAttendance()
   const [noteModal, setNoteModal] = useState<{ memberId: string; memberName: string } | null>(null)
   const [noteText, setNoteText] = useState('')

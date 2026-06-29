@@ -1,18 +1,26 @@
 import { useState } from 'react'
 import { useMembers } from '../hooks/useMembers'
 import { useEvents } from '../hooks/useEvents'
-import { useAttendanceByEvent } from '../hooks/useAttendance'
-import type { AttendanceStatus, Member } from '../types'
+import { useAttendanceByEvent, useAdminAttendanceByEvent } from '../hooks/useAttendance'
+import { useAdmin } from '../hooks/useAdmin'
+import type { AttendanceStatus, Member, Attendance } from '../types'
+
+type IzinEntry = { member: Member; note?: string }
+type StatusEntry = { id: string; name: string; group?: string; note?: string }
 
 function buatTeksRekap(
   judul: string,
   tanggal: string,
   hadir: Member[],
-  izin: Member[],
+  izin: IzinEntry[],
   alfa: Member[],
 ) {
   const daftar = (arr: Member[]) =>
     arr.length ? arr.map((m, i) => `${i + 1}. ${m.name}`).join('\n') : '-'
+  const daftarIzin = (arr: IzinEntry[]) =>
+    arr.length
+      ? arr.map((x, i) => `${i + 1}. ${x.member.name}${x.note ? ` — ${x.note}` : ''}`).join('\n')
+      : '-'
   return `*REKAP ABSENSI APTAMA*
 ${judul} - ${tanggal}
 
@@ -20,7 +28,7 @@ ${judul} - ${tanggal}
 ${daftar(hadir)}
 
 📝 IZIN (${izin.length})
-${daftar(izin)}
+${daftarIzin(izin)}
 
 ❌ TIDAK HADIR (${alfa.length})
 ${daftar(alfa)}`
@@ -47,19 +55,38 @@ function exportCsv(baris: { name: string; group: string; status: string }[]) {
 export function Recap() {
   const { data: events } = useEvents()
   const { data: members } = useMembers()
+  const { isAdmin } = useAdmin()
   const [selectedEvent, setSelectedEvent] = useState('')
-  const { data: attendanceRows } = useAttendanceByEvent(selectedEvent)
+  // Ketua: query admin RPC yang include `note`. Non-ketua: view publik tanpa note.
+  const { data: publicRows } = useAttendanceByEvent(selectedEvent)
+  const { data: adminRows } = useAdminAttendanceByEvent(selectedEvent)
+  const attendanceRows = isAdmin ? adminRows : publicRows
 
   const selectedEv = events?.find((e) => e.id === selectedEvent)
 
-  // Map member_id -> status
+  // Map member_id -> status & note
   const statusMap = new Map<string, AttendanceStatus>()
-  attendanceRows?.forEach((r) => statusMap.set(r.member_id, r.status as AttendanceStatus))
+  const noteMap = new Map<string, string>()
+  attendanceRows?.forEach((r: Attendance) => {
+    statusMap.set(r.member_id, r.status as AttendanceStatus)
+    if (r.note) noteMap.set(r.member_id, r.note)
+  })
 
   const hadir = (members ?? []).filter((m) => statusMap.get(m.id) === 'hadir')
-  const izin = (members ?? []).filter((m) => statusMap.get(m.id) === 'izin')
+  const izin: IzinEntry[] = (members ?? [])
+    .filter((m) => statusMap.get(m.id) === 'izin')
+    .map((m) => ({ member: m, note: noteMap.get(m.id) }))
   const alfa = (members ?? []).filter((m) => !statusMap.has(m.id))
   const total = members?.length ?? 0
+
+  const hadirEntries: StatusEntry[] = hadir.map((m) => ({ id: m.id, name: m.name, group: m.group }))
+  const izinEntries: StatusEntry[] = izin.map((x) => ({
+    id: x.member.id,
+    name: x.member.name,
+    group: x.member.group,
+    note: x.note,
+  }))
+  const alfaEntries: StatusEntry[] = alfa.map((m) => ({ id: m.id, name: m.name, group: m.group }))
 
   function handleShare() {
     if (!selectedEv) return
@@ -141,9 +168,9 @@ export function Recap() {
 
           {/* Detail per status */}
           <div className="space-y-3">
-            <StatusList title="✅ Hadir" items={hadir} color="text-success" />
-            <StatusList title="📝 Izin" items={izin} color="text-warning" />
-            <StatusList title="❌ Tidak Hadir" items={alfa} color="text-danger" />
+            <StatusList title="✅ Hadir" items={hadirEntries} color="text-success" />
+            <StatusList title="📝 Izin" items={izinEntries} color="text-warning" />
+            <StatusList title="❌ Tidak Hadir" items={alfaEntries} color="text-danger" />
           </div>
 
           {/* Action buttons */}
@@ -173,7 +200,7 @@ function StatusList({
   color,
 }: {
   title: string
-  items: Member[]
+  items: StatusEntry[]
   color: string
 }) {
   if (items.length === 0) return null
@@ -184,12 +211,17 @@ function StatusList({
         <span className="text-xs text-text-muted">{items.length} orang</span>
       </div>
       <div className="divide-y divide-white/5">
-        {items.map((m, i) => (
-          <div key={m.id} className="px-4 py-2 flex items-center gap-3">
+        {items.map((entry, i) => (
+          <div key={entry.id} className="px-4 py-2 flex items-center gap-3">
             <span className="text-xs text-text-muted w-5 text-right">{i + 1}.</span>
-            <div className="min-w-0">
-              <p className="text-sm truncate">{m.name}</p>
-              {m.group && <p className="text-xs text-text-muted truncate">{m.group}</p>}
+            <div className="min-w-0 flex-1">
+              <p className="text-sm truncate">{entry.name}</p>
+              {entry.group && <p className="text-xs text-text-muted truncate">{entry.group}</p>}
+              {entry.note && (
+                <p className="text-xs text-text-muted truncate mt-0.5" title={entry.note}>
+                  📝 {entry.note}
+                </p>
+              )}
             </div>
           </div>
         ))}

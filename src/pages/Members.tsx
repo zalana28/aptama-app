@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { useMembers, useAddMember, useUpdateMember, useDeleteMember } from '../hooks/useMembers'
 import { Link } from 'react-router-dom'
+import { useMembers, useAddMember, useUpdateMember, useDeleteMember } from '../hooks/useMembers'
+import { errorMessage } from '../lib/errors'
 import type { Member } from '../types'
 
 type FormData = { name: string; group: string; phone: string }
@@ -30,43 +31,63 @@ export function Members() {
   const [form, setForm] = useState<FormData>(emptyForm)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
+  const [errorMsg, setErrorMsg] = useState('')
+
+  function clearError() {
+    setErrorMsg('')
+    addMember.reset()
+    updateMember.reset()
+    deleteMember.reset()
+  }
 
   function startEdit(m: Member) {
     setEditingId(m.id)
     setForm({ name: m.name, group: m.group ?? '', phone: m.phone ?? '' })
     setShowForm(true)
+    clearError()
   }
 
   function cancelForm() {
     setEditingId(null)
     setForm(emptyForm)
     setShowForm(false)
+    clearError()
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!form.name.trim()) return
+    clearError()
 
-    if (editingId) {
-      await updateMember.mutateAsync({
-        id: editingId,
-        name: form.name.trim(),
-        group: form.group.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-      })
-    } else {
-      await addMember.mutateAsync({
-        name: form.name.trim(),
-        group: form.group.trim() || undefined,
-        phone: form.phone.trim() || undefined,
-      })
+    try {
+      if (editingId) {
+        await updateMember.mutateAsync({
+          id: editingId,
+          name: form.name.trim(),
+          group: form.group.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+        })
+      } else {
+        await addMember.mutateAsync({
+          name: form.name.trim(),
+          group: form.group.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+        })
+      }
+      cancelForm()
+    } catch (err) {
+      setErrorMsg(errorMessage(err, 'Gagal menyimpan anggota.'))
     }
-    cancelForm()
   }
 
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Hapus anggota "${name}"?`)) return
-    await deleteMember.mutateAsync(id)
+    clearError()
+    try {
+      await deleteMember.mutateAsync(id)
+    } catch (err) {
+      setErrorMsg(errorMessage(err, 'Gagal menghapus anggota.'))
+    }
   }
 
   return (
@@ -112,6 +133,20 @@ export function Members() {
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
+          {errorMsg && (
+            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 space-y-1">
+              <p className="text-danger text-xs">⚠️ {errorMsg}</p>
+              <p className="text-text-muted text-[10px]">
+                Diagnostik: jalanin query ini di Supabase SQL Editor untuk cek status RLS:
+              </p>
+              <code className="block bg-bg-input text-text-muted text-[10px] px-2 py-1 rounded font-mono whitespace-pre">
+                SELECT relname, relrowsecurity{'\n'}FROM pg_class{'\n'}WHERE relname IN ('members','events','attendances');
+              </code>
+              <p className="text-text-muted text-[10px]">
+                Kalau relrowsecurity = true, RLS aktif — pastikan setup-full.sql versi terbaru sudah dijalankan.
+              </p>
+            </div>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"

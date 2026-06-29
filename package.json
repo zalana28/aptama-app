@@ -2,6 +2,7 @@
   "name": "aptama-app",
   "private": true,
   "version": "0.0.0",
+  "description": "APTAMA Attendance — aplikasi absensi pemuda untuk kegiatan bersih sampah (React + TypeScript + Supabase).",
   "type": "module",
   "scripts": {
     "dev": "vite",

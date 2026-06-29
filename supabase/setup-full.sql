@@ -381,7 +381,7 @@ BEGIN
   SELECT qt.event_id, qt.expires_at INTO v_event_id, v_expires
   FROM qr_tokens qt WHERE qt.token = p_token;
 
-  IF v_event_id IS NULL OR v_token IS DISTINCT FROM p_token THEN
+  IF v_event_id IS NULL OR v_event_id IS DISTINCT FROM p_event_id THEN
     RAISE EXCEPTION 'QR tidak valid';
   END IF;
   IF v_expires IS NOT NULL AND now() > v_expires THEN

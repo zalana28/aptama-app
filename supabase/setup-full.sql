@@ -166,22 +166,47 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.submit_izin(uuid, uuid, text) TO anon;
 
--- Check-in dari rumah (sebelum jam mulai)
-CREATE OR REPLACE FUNCTION public.self_check_in(p_event_id uuid, p_member_id uuid)
+-- Check-in dari rumah (sebelum jam mulai) + verifikasi wajah
+CREATE OR REPLACE FUNCTION public.self_check_in(
+  p_event_id uuid,
+  p_member_id uuid,
+  p_face_score numeric,
+  p_selfie_url text DEFAULT null,
+  p_device_hash text DEFAULT null
+)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_close timestamptz;
+DECLARE
+  v_close timestamptz;
+  v_face_status text;
 BEGIN
   SELECT checkin_close_at INTO v_close FROM events WHERE id = p_event_id;
   IF v_close IS NULL THEN RAISE EXCEPTION 'Check-in belum dibuka';
   END IF;
   IF now() >= v_close THEN RAISE EXCEPTION 'Check-in sudah ditutup';
   END IF;
-  INSERT INTO attendances (event_id, member_id, status)
-  VALUES (p_event_id, p_member_id, 'hadir')
+
+  SELECT face_status INTO v_face_status FROM members WHERE id = p_member_id;
+  IF v_face_status <> 'approved' THEN
+    RAISE EXCEPTION 'Wajah belum terdaftar / belum di-approve ketua';
+  END IF;
+  IF p_face_score IS NULL OR p_face_score > 0.5 THEN
+    RAISE EXCEPTION 'Wajah tidak cocok';
+  END IF;
+
+  INSERT INTO attendances (
+    event_id, member_id, status, selfie_url, device_hash,
+    face_match_score, verified_status, submitted_at
+  )
+  VALUES (
+    p_event_id, p_member_id, 'hadir', p_selfie_url, p_device_hash,
+    p_face_score, 'auto', now()
+  )
   ON CONFLICT (event_id, member_id) DO NOTHING;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.self_check_in(uuid, uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.self_check_in(
+  uuid, uuid, numeric, text, text
+) TO anon;
 
 -- Verifikasi PIN
 CREATE OR REPLACE FUNCTION public.admin_verify_pin(p_pin text)

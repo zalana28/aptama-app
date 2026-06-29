@@ -78,7 +78,7 @@ export function EnrollFace() {
     const blob = await captureSelfieBlob()
     let selfiePath: string | null = null
     if (blob) {
-      selfiePath = await uploadSelfie(supabase as never, blob, `enroll/${memberId}`)
+      selfiePath = await uploadSelfie(supabase, blob, `enroll/${memberId}`)
     }
 
     const { error: rpcError } = await supabase.rpc('enroll_face', {

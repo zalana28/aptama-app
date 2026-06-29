@@ -1,4 +1,5 @@
 import * as faceapi from 'face-api.js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
 
@@ -43,12 +44,12 @@ export function generateDeviceHash(): string {
 }
 
 export async function uploadSelfie(
-  storage: { from: (bucket: string) => { upload: (path: string, file: Blob, opts?: object) => Promise<{ data?: { path: string }; error?: Error | null }> } },
+  supabase: SupabaseClient,
   blob: Blob,
   prefix: string,
 ): Promise<string | null> {
   const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
-  const { data, error } = await storage.from('face-selfies').upload(path, blob, {
+  const { data, error } = await supabase.storage.from('face-selfies').upload(path, blob, {
     contentType: 'image/jpeg',
     upsert: false,
   })

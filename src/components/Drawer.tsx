@@ -11,7 +11,7 @@ interface DrawerProps {
 
 const publicLinks = [
   { to: '/', label: 'Beranda', icon: Home },
-  { to: '/checkin', label: 'Check-in dari Rumah', icon: LogIn },
+  { to: '/checkin', label: 'Check-in', icon: LogIn },
   { to: '/izin', label: 'Ajukan Izin', icon: FileText },
   { to: '/rekap', label: 'Rekap', icon: BarChart3 },
 ]

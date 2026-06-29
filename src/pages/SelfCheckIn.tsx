@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 import {
   loadFaceModels,
@@ -7,9 +8,17 @@ import {
   generateDeviceHash,
   uploadSelfie,
 } from '../lib/faceApi'
+import { useAdmin } from '../hooks/useAdmin'
 import type { Member, Event } from '../types'
 
+interface QrToken {
+  token: string
+  expires_at: string
+  created_at: string
+}
+
 export function SelfCheckIn() {
+  const { isAdmin } = useAdmin()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -21,12 +30,17 @@ export function SelfCheckIn() {
   const [loadingModels, setLoadingModels] = useState(false)
   const [error, setError] = useState('')
 
+  // Admin QR view
+  const [adminEventId, setAdminEventId] = useState('')
+  const [qrTokens, setQrTokens] = useState<QrToken[]>([])
+  const [qrLoading, setQrLoading] = useState(false)
+
   useEffect(() => {
     supabase.from('members').select('*').order('name')
       .then(({ data }) => setMembers((data ?? []) as Member[]))
 
+    // Ambil SEMUA kegiatan untuk admin, tapi tetap tandai yang check-in-nya masih buka
     supabase.from('events').select('*')
-      .not('checkin_close_at', 'is', null)
       .order('date', { ascending: false })
       .then(({ data }) => {
         const now = Date.now()
@@ -38,8 +52,30 @@ export function SelfCheckIn() {
       })
   }, [])
 
+  useEffect(() => {
+    if (!isAdmin || !adminEventId) {
+      setQrTokens([])
+      return
+    }
+
+    async function loadQr() {
+      setQrLoading(true)
+      const { data, error } = await supabase
+        .from('qr_tokens')
+        .select('token, expires_at, created_at')
+        .eq('event_id', adminEventId)
+        .gte('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+      if (!error) setQrTokens((data ?? []) as QrToken[])
+      setQrLoading(false)
+    }
+
+    loadQr()
+  }, [isAdmin, adminEventId])
+
   const selectedMember = members.find((m) => m.id === memberId)
   const selectedEv = events.find((e) => e.id === eventId)
+  const selectedAdminEv = events.find((e) => e.id === adminEventId)
   const openEvents = events.filter((ev) => ev.is_open)
 
   async function startCamera() {
@@ -133,6 +169,15 @@ export function SelfCheckIn() {
     setStep('done')
   }
 
+  function qrUrl(token: string): string {
+    return `${window.location.origin}/scan?token=${token}`
+  }
+
+  function copyLink(token: string) {
+    navigator.clipboard.writeText(qrUrl(token))
+    alert('Link QR tersalin!')
+  }
+
   if (step === 'done') {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
@@ -155,12 +200,83 @@ export function SelfCheckIn() {
     <div className="max-w-md mx-auto px-4 py-8 space-y-6">
       <div className="text-center space-y-2">
         <div className="text-4xl">🏠</div>
-        <h1 className="text-xl font-bold">Check-in dari Rumah</h1>
+        <h1 className="text-xl font-bold">Check-in</h1>
         <p className="text-text-muted text-sm">
-          Verifikasi wajah sebelum jam mulai kegiatan.
+          Verifikasi wajah untuk absen kegiatan.
         </p>
       </div>
 
+      {/* ---- ADMIN: Tampilkan QR Aktif ---- */}
+      {isAdmin && (
+        <div className="bg-bg-card rounded-xl p-4 border border-white/10 space-y-3">
+          <h2 className="text-sm font-semibold">📱 QR Absen untuk Dicetak / Ditampilkan</h2>
+          <p className="text-xs text-text-muted">
+            Pilih kegiatan untuk menampilkan QR aktif. Anggota scan QR ini lalu verifikasi wajah.
+          </p>
+
+          <select
+            value={adminEventId}
+            onChange={(e) => setAdminEventId(e.target.value)}
+            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+          >
+            <option value="">— Pilih kegiatan —</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.title} ({ev.date}){ev.is_open ? ' · check-in buka' : ''}
+              </option>
+            ))}
+          </select>
+
+          {qrLoading && <p className="text-text-muted text-xs text-center">Memuat QR...</p>}
+
+          {selectedAdminEv && qrTokens.length === 0 && !qrLoading && (
+            <div className="bg-white/5 rounded-lg p-3 text-center space-y-2">
+              <p className="text-text-muted text-xs">Belum ada QR aktif untuk kegiatan ini.</p>
+              <a
+                href="#/generate-qr"
+                className="inline-block text-xs text-primary hover:underline"
+              >
+                Generate QR di sini →
+              </a>
+            </div>
+          )}
+
+          {qrTokens.map((qr, idx) => {
+            const url = qrUrl(qr.token)
+            const expiredAt = new Date(qr.expires_at).toLocaleString('id-ID')
+            return (
+              <div
+                key={qr.token}
+                className={`bg-white rounded-xl p-4 text-center space-y-3 ${idx > 0 ? 'mt-3' : ''}`}
+              >
+                <p className="text-black text-sm font-medium">{selectedAdminEv?.title}</p>
+                <QRCodeSVG value={url} size={220} className="mx-auto" />
+                <p className="text-gray-500 text-xs">
+                  Berlaku sampai: {expiredAt}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => copyLink(qr.token)}
+                    className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                  >
+                    📋 Salin Link
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                  >
+                    🖨️ Cetak
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      <div className="h-px bg-white/10" />
+
+      {/* ---- MEMBER: Check-in dengan Wajah ---- */}
       {openEvents.length === 0 ? (
         <div className="text-center py-8 space-y-2">
           <p className="text-text-muted text-sm">Belum ada kegiatan yang membuka check-in.</p>
@@ -172,6 +288,8 @@ export function SelfCheckIn() {
         <>
           {step === 'form' && (
             <div className="space-y-3">
+              <h2 className="text-sm font-semibold text-center">🙋 Absen dengan Wajah</h2>
+
               <div>
                 <label className="text-xs text-text-muted mb-1 block">Nama</label>
                 <select

@@ -119,7 +119,7 @@ export function Home() {
               <LogIn size={24} className="text-primary" />
             </div>
             <p className="text-sm font-semibold">Check-in</p>
-            <p className="text-[10px] text-text-muted mt-0.5">dari Rumah</p>
+            <p className="text-[10px] text-text-muted mt-0.5">Verifikasi Wajah</p>
           </Card>
         </Link>
         <Link to="/izin">

@@ -3,9 +3,9 @@ import { useEvents, useAddEvent, useUpdateEvent, useDeleteEvent } from '../hooks
 import { errorMessage } from '../lib/errors'
 import type { Event } from '../types'
 
-type FormData = { title: string; date: string; location: string }
+type FormData = { title: string; date: string; time: string; location: string }
 
-const emptyForm: FormData = { title: '', date: '', location: '' }
+const emptyForm: FormData = { title: '', date: '', time: '', location: '' }
 
 function sisaHari(tanggal: string): number {
   const ms = new Date(tanggal).getTime() - Date.now()
@@ -41,7 +41,7 @@ export function Events() {
 
   function startEdit(ev: Event) {
     setEditingId(ev.id)
-    setForm({ title: ev.title, date: ev.date, location: ev.location ?? '' })
+    setForm({ title: ev.title, date: ev.date, time: ev.time ?? '', location: ev.location ?? '' })
     setShowForm(true)
     clearError()
   }
@@ -64,12 +64,14 @@ export function Events() {
           id: editingId,
           title: form.title.trim(),
           date: form.date,
+          time: form.time.trim() || undefined,
           location: form.location.trim() || undefined,
         })
       } else {
         await addEvent.mutateAsync({
           title: form.title.trim(),
           date: form.date,
+          time: form.time.trim() || undefined,
           location: form.location.trim() || undefined,
         })
       }
@@ -122,13 +124,27 @@ export function Events() {
             required
             autoFocus
           />
-          <input
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
-            required
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Tanggal *</label>
+              <input
+                type="date"
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+                required
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-muted mb-1 block">Jam Mulai</label>
+              <input
+                type="time"
+                value={form.time}
+                onChange={(e) => setForm({ ...form, time: e.target.value })}
+                className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+              />
+            </div>
+          </div>
           <input
             type="text"
             placeholder="Lokasi (opsional)"
@@ -190,6 +206,7 @@ export function Events() {
                         <p className="font-medium text-sm">{ev.title}</p>
                         <p className="text-text-muted text-xs mt-0.5">
                           {formatDate(ev.date)}
+                          {ev.time && <span> · {ev.time} WIB</span>}
                           {ev.location && <span> · {ev.location}</span>}
                         </p>
                         <p className="text-primary text-xs mt-1 font-medium">
@@ -233,6 +250,7 @@ export function Events() {
                       <p className="font-medium text-sm">{ev.title}</p>
                       <p className="text-text-muted text-xs mt-0.5">
                         {formatDate(ev.date)}
+                        {ev.time && <span> · {ev.time} WIB</span>}
                         {ev.location && <span> · {ev.location}</span>}
                       </p>
                     </div>

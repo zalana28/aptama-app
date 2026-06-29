@@ -89,7 +89,8 @@ export function Home() {
                 <p className="text-[10px] uppercase tracking-wider text-text-muted font-semibold">Kegiatan Berikutnya</p>
                 <p className="text-sm font-semibold mt-0.5 truncate">{upcoming.title}</p>
                 <p className="text-xs text-text-secondary mt-0.5">
-                  {new Date(upcoming.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · 08.15 WIB
+                  {new Date(upcoming.date + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  {upcoming.time ? ` · ${upcoming.time} WIB` : ' · 08.15 WIB'}
                 </p>
               </div>
             </div>

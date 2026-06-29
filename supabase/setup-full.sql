@@ -43,10 +43,14 @@ CREATE TABLE IF NOT EXISTS events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL,
   date date NOT NULL,
+  time time,
   location text,
   checkin_close_at timestamptz,
   created_at timestamptz DEFAULT now()
 );
+
+-- Tambah kolom time jika tabel events sudah ada sebelumnya
+ALTER TABLE events ADD COLUMN IF NOT EXISTS time time;
 
 CREATE TABLE IF NOT EXISTS attendances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

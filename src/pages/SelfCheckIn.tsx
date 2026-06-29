@@ -316,24 +316,31 @@ export function SelfCheckIn() {
                   <option value="">— Pilih kegiatan —</option>
                   {openEvents.map((ev) => (
                     <option key={ev.id} value={ev.id}>
-                      {ev.title} ({ev.date})
+                      {ev.title} ({ev.date}{ev.time ? ` · ${ev.time}` : ''})
                     </option>
                   ))}
                 </select>
               </div>
 
-              {selectedEv && selectedEv.checkin_close_at && (
-                <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
-                  <p className="text-xs text-primary">
-                    ⏰ Check-in ditutup:{' '}
-                    {new Date(selectedEv.checkin_close_at).toLocaleString('id-ID', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </p>
+              {selectedEv && (
+                <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 space-y-1">
+                  {selectedEv.time && (
+                    <p className="text-xs text-primary">
+                      🕐 Jam kegiatan: {selectedEv.time} WIB
+                    </p>
+                  )}
+                  {selectedEv.checkin_close_at && (
+                    <p className="text-xs text-primary">
+                      ⏰ Check-in ditutup:{' '}
+                      {new Date(selectedEv.checkin_close_at).toLocaleString('id-ID', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
                 </div>
               )}
 

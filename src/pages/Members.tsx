@@ -158,7 +158,7 @@ export function Members() {
             <button
               type="button"
               onClick={cancelForm}
-              className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-white/5 transition"
+              className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-text/[0.05] transition"
             >
               Batal
             </button>
@@ -193,14 +193,14 @@ export function Members() {
               <div className="flex gap-1 ml-3 shrink-0">
                 <button
                   onClick={() => startEdit(m)}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-secondary hover:bg-white/5 transition text-xs"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-secondary hover:bg-text/[0.05] transition text-xs"
                   title="Edit"
                 >
                   ✏️
                 </button>
                 <button
                   onClick={() => handleDelete(m.id, m.name)}
-                  className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-white/5 transition text-xs"
+                  className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-text/[0.05] transition text-xs"
                   title="Hapus"
                 >
                   🗑️

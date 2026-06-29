@@ -232,7 +232,7 @@ export function ScanPage() {
           <p className="text-danger text-sm">{error}</p>
           <button
             onClick={() => setStep('select')}
-            className="w-full bg-white/5 text-text px-4 py-2 rounded-lg text-sm hover:bg-white/10 transition"
+            className="w-full bg-text/[0.05] text-text px-4 py-2 rounded-lg text-sm hover:bg-text/[0.10] transition"
           >
             Coba Lagi
           </button>

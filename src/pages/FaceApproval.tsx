@@ -78,7 +78,7 @@ export function FaceApproval() {
               key={m.id}
               className="bg-bg-card rounded-xl p-4 border border-white/10 flex items-start gap-4"
             >
-              <div className="shrink-0 w-16 h-16 bg-white/5 rounded-xl flex items-center justify-center overflow-hidden">
+              <div className="shrink-0 w-16 h-16 bg-text/[0.05] rounded-xl flex items-center justify-center overflow-hidden">
                 {m.face_selfie_url ? (
                   <SelfieImage path={m.face_selfie_url} />
                 ) : (

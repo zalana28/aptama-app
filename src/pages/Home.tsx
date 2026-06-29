@@ -192,7 +192,7 @@ export function Home() {
               <span>Kehadiran Terakhir</span>
               <span className="font-medium text-text">{avgAttendance}%</span>
             </div>
-            <div className="w-full bg-white/10 rounded-full h-2">
+            <div className="w-full bg-text/[0.10] rounded-full h-2">
               <div
                 className="bg-success rounded-full h-2 transition-all"
                 style={{ width: `${avgAttendance}%` }}
@@ -238,7 +238,7 @@ export function Home() {
 
         <Link to="/rekap">
           <Card className="flex items-center gap-3 group">
-            <div className="p-2.5 rounded-xl bg-white/5 group-hover:bg-primary/15 transition">
+            <div className="p-2.5 rounded-xl bg-text/[0.05] group-hover:bg-primary/15 transition">
               <BarChart3 size={18} className="text-text-secondary group-hover:text-primary transition" />
             </div>
             <div className="flex-1">
@@ -250,7 +250,7 @@ export function Home() {
 
         <Link to={isAdmin ? '/generate-qr' : '#'} onClick={(e) => { if (!isAdmin) e.preventDefault() }}>
           <Card className={`flex items-center gap-3 group ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            <div className="p-2.5 rounded-xl bg-white/5 group-hover:bg-primary/15 transition">
+            <div className="p-2.5 rounded-xl bg-text/[0.05] group-hover:bg-primary/15 transition">
               <QrCode size={18} className="text-text-secondary group-hover:text-primary transition" />
             </div>
             <div className="flex-1">
@@ -263,7 +263,7 @@ export function Home() {
 
         <Link to={isAdmin ? '/import' : '#'} onClick={(e) => { if (!isAdmin) e.preventDefault() }}>
           <Card className={`flex items-center gap-3 group ${!isAdmin ? 'opacity-50 cursor-not-allowed' : ''}`}>
-            <div className="p-2.5 rounded-xl bg-white/5 group-hover:bg-primary/15 transition">
+            <div className="p-2.5 rounded-xl bg-text/[0.05] group-hover:bg-primary/15 transition">
               <Upload size={18} className="text-text-secondary group-hover:text-primary transition" />
             </div>
             <div className="flex-1">

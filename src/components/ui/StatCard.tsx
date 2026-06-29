@@ -13,7 +13,7 @@ const colorMap = {
   green: 'text-success',
   gold: 'text-secondary',
   red: 'text-danger',
-  white: 'text-white',
+  white: 'text-text',
   blue: 'text-blue-400',
   purple: 'text-purple-400',
 }

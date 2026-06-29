@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Aplikasi Absensi Pemuda APTAMA — Kegiatan Bersih Sampah" />
     <meta name="theme-color" content="#1B7A3D" />
+    <script>
+      (function () {
+        try {
+          const theme = localStorage.getItem('aptama-theme') || 'system'
+          const resolved = theme === 'system'
+            ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+            : theme
+          if (resolved === 'dark') document.documentElement.classList.add('dark')
+          else document.documentElement.classList.remove('dark')
+        } catch (e) {}
+      })()
+    </script>
     <meta property="og:title" content="APTAMA — Absensi" />
     <meta property="og:description" content="Aplikasi Absensi Angkatan Pucanganom Tiga Muda" />
     <meta property="og:image" content="/logos/aptama-512.png" />

@@ -109,8 +109,8 @@ export function ImportData() {
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
       <h1 className="text-xl font-bold">📥 Import Rekap Lama</h1>
       <p className="text-text-muted text-sm">
-        Masukkan data absensi lama untuk satu kegiatan. Format: <code className="bg-white/10 px-1 rounded">Nama,Status</code> atau{' '}
-        <code className="bg-white/10 px-1 rounded">Nama,Status,Catatan</code>. Status: hadir / izin / alfa.
+        Masukkan data absensi lama untuk satu kegiatan. Format: <code className="bg-text/[0.10] px-1 rounded">Nama,Status</code> atau{' '}
+        <code className="bg-text/[0.10] px-1 rounded">Nama,Status,Catatan</code>. Status: hadir / izin / alfa.
       </p>
 
       <div>
@@ -133,7 +133,7 @@ export function ImportData() {
           type="file"
           accept=".csv,.txt"
           onChange={handleFile}
-          className="block w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-white/10 file:text-text hover:file:bg-white/20"
+          className="block w-full text-sm text-text-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-text/[0.10] file:text-text hover:file:bg-white/20"
         />
       </div>
 
@@ -151,7 +151,7 @@ export function ImportData() {
       <button
         onClick={handleParse}
         disabled={!raw.trim()}
-        className="w-full bg-white/5 text-text px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/10 transition disabled:opacity-50"
+        className="w-full bg-text/[0.05] text-text px-4 py-2 rounded-lg text-sm font-medium hover:bg-text/[0.10] transition disabled:opacity-50"
       >
         🔍 Parse Data
       </button>

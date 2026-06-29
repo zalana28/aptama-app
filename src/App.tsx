@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AdminProvider } from './hooks/AdminProvider'
+import { ThemeProvider } from './hooks/ThemeContext'
 import { Navbar } from './components/Navbar'
 import { AdminGate } from './components/AdminGate'
 import { Logo } from './components/Logo'
@@ -109,13 +110,15 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AnimatePresence mode="wait">
-        {showSplash ? (
-          <SplashScreen key="splash" />
-        ) : (
-          <MainApp key="main" />
-        )}
-      </AnimatePresence>
+      <ThemeProvider>
+        <AnimatePresence mode="wait">
+          {showSplash ? (
+            <SplashScreen key="splash" />
+          ) : (
+            <MainApp key="main" />
+          )}
+        </AnimatePresence>
+      </ThemeProvider>
     </QueryClientProvider>
   )
 }

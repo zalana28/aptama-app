@@ -1,7 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Home, LogIn, FileText, BarChart3, QrCode, KeyRound, Users, Calendar, ClipboardCheck, Lock, Settings, ShieldCheck } from 'lucide-react'
+import { X, Home, LogIn, FileText, BarChart3, QrCode, KeyRound, Users, Calendar, ClipboardCheck, Lock, Settings, ShieldCheck, Sun, Moon } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAdmin } from '../hooks/useAdmin'
+import { useTheme } from '../hooks/useTheme'
 import { Logo } from './Logo'
 
 interface DrawerProps {
@@ -27,6 +28,7 @@ const adminLinks = [
 
 export function Drawer({ open, onClose }: DrawerProps) {
   const { isAdmin, login, logout } = useAdmin()
+  const { resolvedTheme, toggleTheme } = useTheme()
   const location = useLocation()
 
   async function handleAdminToggle() {
@@ -143,15 +145,24 @@ export function Drawer({ open, onClose }: DrawerProps) {
               })}
             </nav>
 
-            {/* Footer: Admin toggle */}
-            <div className="p-4 border-t border-border">
+            {/* Footer: Theme toggle + Admin toggle */}
+            <div className="p-4 border-t border-border space-y-2">
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => { toggleTheme(); }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all bg-bg-card border border-border text-text-secondary hover:text-text hover:border-border-hover"
+              >
+                {resolvedTheme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                {resolvedTheme === 'dark' ? 'Mode Terang' : 'Mode Gelap'}
+              </motion.button>
+
               <motion.button
                 whileTap={{ scale: 0.97 }}
                 onClick={handleAdminToggle}
                 className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                   isAdmin
                     ? 'bg-primary/15 text-primary border border-primary/30'
-                    : 'bg-white/5 text-text-secondary border border-border hover:border-primary/40 hover:text-white'
+                    : 'bg-bg-card text-text-secondary border border-border hover:border-primary/40 hover:text-text'
                 }`}
               >
                 <KeyRound size={16} />

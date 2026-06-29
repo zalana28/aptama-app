@@ -241,7 +241,7 @@ export function Attendance() {
               </button>
               <button
                 onClick={() => { setNoteModal(null); setNoteText('') }}
-                className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-white/5 transition"
+                className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-text/[0.05] transition"
               >
                 Batal
               </button>

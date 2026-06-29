@@ -212,7 +212,7 @@ export function Recap() {
                   {Math.round((hadir.length / total) * 100)}%
                 </span>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-2">
+              <div className="w-full bg-text/[0.10] rounded-full h-2">
                 <div
                   className="bg-success rounded-full h-2 transition-all"
                   style={{ width: `${(hadir.length / total) * 100}%` }}

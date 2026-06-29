@@ -103,35 +103,47 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 );
 
 -- ============================================
--- RLS + GRANTS + POLICIES (client-side CRUD)
--- Threat model: internal/community use, Ketua-only mutation
--- via UI gate (PIN). RLS off + permissive policies fallback
--- supaya tetap jalan walaupun Supabase force-enable RLS.
--- For production-grade security, replace with RLS policies
--- + SECURITY DEFINER RPCs.
+-- RLS + GRANTS + POLICIES
+-- Threat model: internal/community use. All reads public.
+-- All writes (insert/update/delete) go through SECURITY DEFINER RPCs
+-- that verify the Ketua PIN. Direct table mutations are blocked.
 -- ============================================
-ALTER TABLE members DISABLE ROW LEVEL SECURITY;
-ALTER TABLE events DISABLE ROW LEVEL SECURITY;
-ALTER TABLE attendances DISABLE ROW LEVEL SECURITY;
-ALTER TABLE qr_tokens DISABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_config DISABLE ROW LEVEL SECURITY;
+ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attendances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE qr_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_config ENABLE ROW LEVEL SECURITY;
 
+-- Hapus policies lama yang terlalu permisif
 DROP POLICY IF EXISTS "anon_all_members" ON members;
 DROP POLICY IF EXISTS "anon_all_events" ON events;
 DROP POLICY IF EXISTS "anon_all_attendances" ON attendances;
 DROP POLICY IF EXISTS "anon_all_qr_tokens" ON qr_tokens;
 DROP POLICY IF EXISTS "anon_all_admin_config" ON admin_config;
 
-CREATE POLICY "anon_all_members" ON members FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_all_events" ON events FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_all_attendances" ON attendances FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_all_qr_tokens" ON qr_tokens FOR ALL TO anon USING (true) WITH CHECK (true);
-CREATE POLICY "anon_all_admin_config" ON admin_config FOR ALL TO anon USING (true) WITH CHECK (true);
+-- Public read-only untuk members & events
+CREATE POLICY "anon_select_members" ON members FOR SELECT TO anon USING (true);
+CREATE POLICY "anon_select_events" ON events FOR SELECT TO anon USING (true);
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON members TO anon;
-GRANT SELECT, INSERT, UPDATE, DELETE ON events TO anon;
--- attendances: no SELECT grant (privasi — view attendance_public tanpa 'note' yang dipakai client)
-GRANT INSERT, UPDATE, DELETE ON attendances TO anon;
+-- attendances: tidak bisa diakses langsung; baca lewat view, tulis lewat RPC
+CREATE POLICY "block_all_attendances" ON attendances FOR ALL TO anon USING (false) WITH CHECK (false);
+
+-- qr_tokens: tidak bisa diakses langsung; lewat RPC generate_qr_token / check_in_with_face
+CREATE POLICY "block_all_qr_tokens" ON qr_tokens FOR ALL TO anon USING (false) WITH CHECK (false);
+
+-- admin_config: tidak bisa diakses langsung; lewat RPC
+CREATE POLICY "block_all_admin_config" ON admin_config FOR ALL TO anon USING (false) WITH CHECK (false);
+
+-- Hapus grants langsung yang terlalu permisif
+REVOKE ALL ON members FROM anon;
+REVOKE ALL ON events FROM anon;
+REVOKE ALL ON attendances FROM anon;
+REVOKE ALL ON qr_tokens FROM anon;
+REVOKE ALL ON admin_config FROM anon;
+
+-- Berikan kembali hak baca publik
+GRANT SELECT ON members TO anon;
+GRANT SELECT ON events TO anon;
 
 -- ============================================
 -- VIEWS (create or replace)
@@ -541,3 +553,137 @@ BEGIN
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_get_attendance(uuid, text) TO anon;
+
+-- ============================================
+-- ADMIN CRUD: MEMBERS
+-- ============================================
+CREATE OR REPLACE FUNCTION public.admin_add_member(
+  p_pin text,
+  p_name text,
+  p_group text DEFAULT null,
+  p_phone text DEFAULT null
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_id uuid;
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  INSERT INTO members (name, "group", phone)
+  VALUES (p_name, p_group, p_phone)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_add_member(text, text, text, text) TO anon;
+
+CREATE OR REPLACE FUNCTION public.admin_update_member(
+  p_pin text,
+  p_member_id uuid,
+  p_name text,
+  p_group text DEFAULT null,
+  p_phone text DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  UPDATE members
+  SET name = p_name,
+      "group" = p_group,
+      phone = p_phone
+  WHERE id = p_member_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_update_member(text, uuid, text, text, text) TO anon;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_member(
+  p_pin text,
+  p_member_id uuid
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  DELETE FROM members WHERE id = p_member_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_delete_member(text, uuid) TO anon;
+
+-- ============================================
+-- ADMIN CRUD: EVENTS
+-- ============================================
+CREATE OR REPLACE FUNCTION public.admin_add_event(
+  p_pin text,
+  p_title text,
+  p_date date,
+  p_time time DEFAULT null,
+  p_location text DEFAULT null,
+  p_checkin_close_at timestamptz DEFAULT null
+)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE v_id uuid;
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  INSERT INTO events (title, date, time, location, checkin_close_at)
+  VALUES (p_title, p_date, p_time, p_location, p_checkin_close_at)
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_add_event(text, text, date, time, text, timestamptz) TO anon;
+
+CREATE OR REPLACE FUNCTION public.admin_update_event(
+  p_pin text,
+  p_event_id uuid,
+  p_title text,
+  p_date date,
+  p_time time DEFAULT null,
+  p_location text DEFAULT null,
+  p_checkin_close_at timestamptz DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  UPDATE events
+  SET title = p_title,
+      date = p_date,
+      time = p_time,
+      location = p_location,
+      checkin_close_at = p_checkin_close_at
+  WHERE id = p_event_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_update_event(text, uuid, text, date, time, text, timestamptz) TO anon;
+
+CREATE OR REPLACE FUNCTION public.admin_delete_event(
+  p_pin text,
+  p_event_id uuid
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  DELETE FROM events WHERE id = p_event_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_delete_event(text, uuid) TO anon;
+
+-- ============================================
+-- ADMIN: UPSERT ATTENDANCE (manual absen)
+-- ============================================
+CREATE OR REPLACE FUNCTION public.admin_upsert_attendance(
+  p_pin text,
+  p_event_id uuid,
+  p_member_id uuid,
+  p_status text,
+  p_note text DEFAULT null
+)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN RAISE EXCEPTION 'PIN salah'; END IF;
+  IF p_status NOT IN ('hadir','izin','alfa') THEN
+    RAISE EXCEPTION 'Status tidak valid';
+  END IF;
+  INSERT INTO attendances (event_id, member_id, status, note, verified_status)
+  VALUES (p_event_id, p_member_id, p_status, p_note, 'manual')
+  ON CONFLICT (event_id, member_id)
+  DO UPDATE SET status = EXCLUDED.status, note = EXCLUDED.note, verified_status = 'manual';
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_upsert_attendance(text, uuid, uuid, text, text) TO anon;

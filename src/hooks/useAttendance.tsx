@@ -41,6 +41,12 @@ export function useAdminAttendanceByEvent(eventId: string) {
   })
 }
 
+function getAdminPin(): string {
+  const pin = localStorage.getItem('aptama_admin_pin')
+  if (!pin) throw new Error('PIN admin belum diset')
+  return pin
+}
+
 export function useUpsertAttendance() {
   const qc = useQueryClient()
   return useMutation({
@@ -55,16 +61,14 @@ export function useUpsertAttendance() {
       status: AttendanceStatus
       note?: string
     }) => {
-      const { data, error } = await supabase
-        .from('attendances')
-        .upsert(
-          { event_id, member_id, status, note } as never,
-          { onConflict: 'event_id,member_id' },
-        )
-        .select()
-        .single()
+      const { error } = await supabase.rpc('admin_upsert_attendance', {
+        p_pin: getAdminPin(),
+        p_event_id: event_id,
+        p_member_id: member_id,
+        p_status: status,
+        p_note: note ?? null,
+      })
       if (error) throw error
-      return data as Attendance
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['attendance', vars.event_id] })

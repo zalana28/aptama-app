@@ -135,18 +135,14 @@ GRANT SELECT ON member_recap TO anon, authenticated;
 -- ============================================
 
 insert into storage.buckets (id, name, public)
-values ('face-selfies', 'face-selfies', false)
+values ('selfies', 'selfies', false)
 on conflict (id) do nothing;
 
 -- Anon boleh upload selfie saat enroll/absen
-CREATE POLICY IF NOT EXISTS "public_upload_selfies"
+DROP POLICY IF EXISTS "anon upload selfie" ON storage.objects;
+CREATE POLICY "anon upload selfie"
   ON storage.objects FOR INSERT TO anon
-  WITH CHECK (bucket_id = 'face-selfies');
-
--- Admin bisa baca selfie (via signed URL / RPC)
-CREATE POLICY IF NOT EXISTS "admin_read_selfies"
-  ON storage.objects FOR SELECT TO anon
-  USING (bucket_id = 'face-selfies');
+  WITH CHECK (bucket_id = 'selfies');
 
 -- ============================================
 -- RPC FUNCTIONS
@@ -289,6 +285,9 @@ BEGIN
          face_enrolled_at = now(),
          face_selfie_url = p_selfie_url
    WHERE id = p_member_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Anggota tidak ditemukan';
+  END IF;
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.enroll_face(uuid, jsonb, text) TO anon;

@@ -100,7 +100,7 @@ export function ScanPage() {
     const blob = await captureSelfieBlob()
     let selfiePath: string | null = null
     if (blob) {
-      selfiePath = await uploadSelfie(supabase, blob, `checkin/${selectedMember.id}`)
+      selfiePath = await uploadSelfie(supabase, blob, `face-checkin/${selectedMember.id}/${Date.now()}.jpg`)
     }
 
     const deviceHash = generateDeviceHash()

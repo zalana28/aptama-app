@@ -1,11 +1,11 @@
 import * as faceapi from 'face-api.js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
+const MODEL_URL = '/models'
 
 let modelsLoaded = false
 
-export async function loadFaceModels(): Promise<void> {
+export async function ensureFaceModelsLoaded(): Promise<void> {
   if (modelsLoaded) return
   await Promise.all([
     faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
@@ -15,12 +15,16 @@ export async function loadFaceModels(): Promise<void> {
   modelsLoaded = true
 }
 
+// Alias untuk backward compatibility
+export const loadFaceModels = ensureFaceModelsLoaded
+
 export async function getDescriptor(video: HTMLVideoElement): Promise<number[] | null> {
-  const detection = await faceapi
+  const result = await faceapi
     .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
     .withFaceLandmarks()
     .withFaceDescriptor()
-  return detection ? Array.from(detection.descriptor) : null
+  if (!result?.descriptor) return null
+  return Array.from(result.descriptor)
 }
 
 export function faceDistance(a: number[], b: number[]): number {
@@ -43,19 +47,40 @@ export function generateDeviceHash(): string {
   return 'd' + Math.abs(hash).toString(16)
 }
 
+export async function captureSelfieBlob(video: HTMLVideoElement): Promise<Blob> {
+  const canvas = document.createElement('canvas')
+  canvas.width = video.videoWidth || 640
+  canvas.height = video.videoHeight || 480
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Canvas tidak didukung browser')
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) reject(new Error('Gagal mengambil foto selfie'))
+        else resolve(blob)
+      },
+      'image/jpeg',
+      0.85,
+    )
+  })
+}
+
 export async function uploadSelfie(
   supabase: SupabaseClient,
   blob: Blob,
-  prefix: string,
-): Promise<string | null> {
-  const path = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`
-  const { data, error } = await supabase.storage.from('face-selfies').upload(path, blob, {
+  filePath: string,
+): Promise<string> {
+  const { data, error } = await supabase.storage.from('selfies').upload(filePath, blob, {
     contentType: 'image/jpeg',
-    upsert: false,
+    upsert: true,
   })
-  if (error || !data) {
-    console.error('Upload selfie gagal', error)
-    return null
+  if (error) {
+    console.error('Upload selfie gagal:', error)
+    throw new Error(error.message || 'Gagal upload selfie')
+  }
+  if (!data?.path) {
+    throw new Error('Upload selfie tidak mengembalikan path')
   }
   return data.path
 }

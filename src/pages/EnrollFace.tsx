@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { loadFaceModels, getDescriptor, uploadSelfie } from '../lib/faceApi'
+import {
+  ensureFaceModelsLoaded,
+  getDescriptor,
+  captureSelfieBlob,
+  uploadSelfie,
+} from '../lib/faceApi'
 import type { Member } from '../types'
 
 export function EnrollFace() {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const [members, setMembers] = useState<Member[]>([])
   const [memberId, setMemberId] = useState('')
   const [loadingModels, setLoadingModels] = useState(true)
@@ -15,8 +19,15 @@ export function EnrollFace() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    supabase.from('members').select('*').order('name')
-      .then(({ data }) => setMembers((data ?? []) as Member[]))
+    async function load() {
+      try {
+        const { data } = await supabase.from('members').select('*').order('name')
+        setMembers((data ?? []) as Member[])
+      } catch (err) {
+        console.error('Gagal memuat anggota:', err)
+      }
+    }
+    load()
   }, [])
 
   useEffect(() => {
@@ -25,7 +36,7 @@ export function EnrollFace() {
     async function start() {
       try {
         setLoadingModels(true)
-        await loadFaceModels()
+        await ensureFaceModelsLoaded()
         setLoadingModels(false)
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user', width: 640, height: 480 },
@@ -35,7 +46,8 @@ export function EnrollFace() {
           videoRef.current.srcObject = stream
         }
         setCameraOn(true)
-      } catch {
+      } catch (err) {
+        console.error('Gagal akses kamera:', err)
         setError('Tidak bisa akses kamera. Pastikan izin kamera diizinkan.')
         setLoadingModels(false)
       }
@@ -48,60 +60,72 @@ export function EnrollFace() {
     }
   }, [])
 
-  async function captureSelfieBlob(): Promise<Blob | null> {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return null
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob ?? null), 'image/jpeg', 0.85)
-    })
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!memberId) return
     setError('')
+
+    if (!memberId) {
+      setError('Pilih nama dulu.')
+      return
+    }
+    if (!videoRef.current) {
+      setError('Kamera belum siap.')
+      return
+    }
+
     setSubmitting(true)
 
-    const descriptor = await getDescriptor(videoRef.current!)
-    if (!descriptor) {
-      setError('Wajah tidak terdeteksi. Coba di tempat terang dan hadapkan wajah ke kamera.')
+    try {
+      console.log('memberId:', memberId)
+
+      await ensureFaceModelsLoaded()
+      const descriptor = await getDescriptor(videoRef.current)
+      console.log('descriptor:', descriptor ? `terdeteksi (${descriptor.length})` : 'tidak terdeteksi')
+
+      if (!descriptor) {
+        setError('Wajah tidak terdeteksi. Coba di tempat terang dan hadapkan wajah ke kamera.')
+        return
+      }
+
+      const descriptorArray = Array.from(descriptor)
+      console.log('descriptor length:', descriptorArray.length)
+
+      const selfieBlob = await captureSelfieBlob(videoRef.current)
+      const filePath = `face-enroll/${memberId}/${Date.now()}.jpg`
+      console.log('selfie path:', filePath)
+
+      const uploadedPath = await uploadSelfie(supabase, selfieBlob, filePath)
+      console.log('uploaded path:', uploadedPath)
+
+      const { error: rpcError } = await supabase.rpc('enroll_face', {
+        p_member_id: memberId,
+        p_descriptor: descriptorArray as never,
+        p_selfie_url: uploadedPath,
+      })
+
+      if (rpcError) {
+        console.error('RPC enroll_face gagal:', rpcError)
+        setError(rpcError.message || 'Gagal menyimpan data wajah.')
+        return
+      }
+
+      console.log('enroll_face berhasil')
+      setDone(true)
+    } catch (err: any) {
+      console.error('Gagal daftar wajah:', err)
+      setError('Gagal mendaftarkan wajah: ' + (err?.message ?? 'error tidak diketahui'))
+    } finally {
       setSubmitting(false)
-      return
     }
-
-    const blob = await captureSelfieBlob()
-    let selfiePath: string | null = null
-    if (blob) {
-      selfiePath = await uploadSelfie(supabase, blob, `enroll/${memberId}`)
-    }
-
-    const { error: rpcError } = await supabase.rpc('enroll_face', {
-      p_member_id: memberId,
-      p_descriptor: descriptor as never,
-      p_selfie_url: selfiePath,
-    })
-
-    setSubmitting(false)
-    if (rpcError) {
-      setError(rpcError.message || 'Gagal mendaftarkan wajah.')
-      return
-    }
-    setDone(true)
   }
 
   if (done) {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
         <div className="text-5xl">✅</div>
-        <h1 className="text-xl font-bold text-success">Wajah Terdaftar!</h1>
+        <h1 className="text-xl font-bold text-success">Wajah Terkirim!</h1>
         <p className="text-text-muted text-sm">
-          Data wajah sudah dikirim. Tunggu ketua approve supaya bisa dipakai absen.
+          Wajah terkirim. Tunggu ketua approve supaya bisa dipakai absen.
         </p>
         <button
           onClick={() => { setDone(false); setMemberId(''); setError('') }}
@@ -158,8 +182,6 @@ export function EnrollFace() {
             </div>
           )}
         </div>
-
-        <canvas ref={canvasRef} className="hidden" />
 
         {error && <p className="text-danger text-sm">{error}</p>}
 

@@ -142,7 +142,7 @@ function SelfieImage({ path }: { path: string }) {
 
   useEffect(() => {
     supabase.storage
-      .from('face-selfies')
+      .from('selfies')
       .createSignedUrl(path, 60)
       .then(({ data, error }) => {
         if (!error && data?.signedUrl) setUrl(data.signedUrl)

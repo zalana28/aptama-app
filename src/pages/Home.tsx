@@ -69,7 +69,7 @@ export function Home() {
           transition={{ delay: 0.3 }}
           className="text-text-secondary text-sm mt-1"
         >
-          Absensi Kegiatan Pilah Sampah
+          Daftar Hadir Kegiatan Kepemudaan
         </motion.p>
         <motion.p
           initial={{ opacity: 0 }}

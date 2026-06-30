@@ -70,7 +70,7 @@ export function SplashScreen() {
             className="mt-2 text-base font-semibold text-[#9A8C2E]"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            Absensi Kegiatan Pilah Sampah
+            Daftar Hadir Kegiatan Kepemudaan
           </p>
           <p
             className="mt-1.5 text-xs tracking-wide text-zinc-400"

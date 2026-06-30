@@ -113,11 +113,25 @@ CREATE TABLE IF NOT EXISTS qr_tokens (
 -- All writes (insert/update/delete) go through SECURITY DEFINER RPCs
 -- that verify the Ketua PIN. Direct table mutations are blocked.
 -- ============================================
-ALTER TABLE members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE attendances ENABLE ROW LEVEL SECURITY;
-ALTER TABLE qr_tokens ENABLE ROW LEVEL SECURITY;
-ALTER TABLE admin_config ENABLE ROW LEVEL SECURITY;
+-- Enable RLS hanya jika belum aktif (supaya idempotent aman di-run ulang)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'members' AND relrowsecurity = true) THEN
+    ALTER TABLE members ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'events' AND relrowsecurity = true) THEN
+    ALTER TABLE events ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'attendances' AND relrowsecurity = true) THEN
+    ALTER TABLE attendances ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'qr_tokens' AND relrowsecurity = true) THEN
+    ALTER TABLE qr_tokens ENABLE ROW LEVEL SECURITY;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'admin_config' AND relrowsecurity = true) THEN
+    ALTER TABLE admin_config ENABLE ROW LEVEL SECURITY;
+  END IF;
+END $$;
 
 -- Hapus policies lama yang terlalu permisif
 DROP POLICY IF EXISTS "anon_all_members" ON members;

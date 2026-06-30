@@ -1,15 +1,18 @@
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
 import { useEvents } from '../hooks/useEvents'
 import { useAdmin } from '../hooks/useAdmin'
 import { supabase } from '../lib/supabase'
 
 export function GenerateQR() {
+  const qc = useQueryClient()
   const { data: events } = useEvents()
   const { isAdmin } = useAdmin()
   const [selectedEvent, setSelectedEvent] = useState('')
   const [qrUrl, setQrUrl] = useState('')
   const [token, setToken] = useState('')
+  const [expiresAt, setExpiresAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [duration, setDuration] = useState(120)
@@ -28,10 +31,10 @@ export function GenerateQR() {
       return
     }
 
-    const { data, error: rpcError } = await supabase.rpc('generate_qr_token', {
-      p_event_id: selectedEvent,
+    const { data, error: rpcError } = await supabase.rpc('admin_generate_checkin_qr', {
       p_pin: pin,
-      p_duration_minutes: duration,
+      p_event_id: selectedEvent,
+      p_minutes: duration,
     })
 
     setLoading(false)
@@ -40,10 +43,26 @@ export function GenerateQR() {
       return
     }
 
-    const t = data as string
-    setToken(t)
-    const url = `${window.location.origin}/scan?token=${t}`
+    const result = (Array.isArray(data) ? data[0] : data) as {
+      event_id: string
+      checkin_token: string
+      checkin_expires_at: string
+    }
+
+    if (!result?.checkin_token) {
+      setError('Token QR gagal dibuat.')
+      return
+    }
+
+    console.log('[GenerateQR] QR tersimpan di events:', result)
+
+    setToken(result.checkin_token)
+    setExpiresAt(result.checkin_expires_at)
+    const url = `${window.location.origin}/scan?token=${result.checkin_token}`
     setQrUrl(url)
+
+    // PENTING: refresh data events agar halaman lain (Check-in) bisa baca QR aktif
+    await qc.invalidateQueries({ queryKey: ['events'] })
   }
 
   function handleCopy() {
@@ -113,8 +132,9 @@ export function GenerateQR() {
           <div className="space-y-1">
             <p className="text-black text-sm font-medium">{selectedEv?.title}</p>
             <p className="text-gray-500 text-xs">
-              Berlaku {duration} menit · Token: {token.slice(0, 8)}...
+              Berlaku sampai: {expiresAt ? new Date(expiresAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : `${duration} menit`}
             </p>
+            <p className="text-gray-400 text-[10px] font-mono">Token: {token.slice(0, 12)}…</p>
           </div>
           <div className="flex gap-2">
             <button

@@ -11,12 +11,6 @@ import {
 import { useAdmin } from '../hooks/useAdmin'
 import type { Member, Event } from '../types'
 
-interface QrToken {
-  token: string
-  expires_at: string
-  created_at: string
-}
-
 export function SelfCheckIn() {
   const { isAdmin } = useAdmin()
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -32,8 +26,6 @@ export function SelfCheckIn() {
 
   // Admin QR view
   const [adminEventId, setAdminEventId] = useState('')
-  const [qrTokens, setQrTokens] = useState<QrToken[]>([])
-  const [qrLoading, setQrLoading] = useState(false)
 
   useEffect(() => {
     supabase.from('members').select('*').order('name')
@@ -53,27 +45,30 @@ export function SelfCheckIn() {
   }, [])
 
   useEffect(() => {
-    if (!isAdmin || !adminEventId) {
-      setQrTokens([])
-      return
-    }
-
-    async function loadQr() {
-      setQrLoading(true)
-      const { data, error } = await supabase.rpc('get_active_qr_tokens', {
-        p_event_id: adminEventId,
-      })
-      if (!error) setQrTokens((data ?? []) as QrToken[])
-      setQrLoading(false)
-    }
-
-    loadQr()
+    // Tidak perlu fetch QR terpisah — QR aktif sudah tersimpan di kolom events.checkin_token
+    // yang akan ikut ter-fetch lewat useEvents() di bawah.
   }, [isAdmin, adminEventId])
 
   const selectedMember = members.find((m) => m.id === memberId)
   const selectedEv = events.find((e) => e.id === eventId)
   const selectedAdminEv = events.find((e) => e.id === adminEventId)
   const openEvents = events.filter((ev) => ev.is_open)
+
+  // QR aktif dibaca langsung dari kolom events.checkin_token + checkin_expires_at
+  const hasActiveQr = !!(
+    selectedAdminEv?.checkin_token &&
+    selectedAdminEv.checkin_expires_at &&
+    new Date(selectedAdminEv.checkin_expires_at).getTime() > Date.now()
+  )
+
+  // Debug log (hapus setelah bug selesai)
+  if (isAdmin && adminEventId) {
+    console.log('[SelfCheckIn] selectedAdminEv:', selectedAdminEv)
+    console.log('[SelfCheckIn] checkin_token:', selectedAdminEv?.checkin_token)
+    console.log('[SelfCheckIn] checkin_expires_at:', selectedAdminEv?.checkin_expires_at)
+    console.log('[SelfCheckIn] Now:', new Date().toISOString())
+    console.log('[SelfCheckIn] Has active QR:', hasActiveQr)
+  }
 
   async function startCamera() {
     if (!selectedMember) return
@@ -224,9 +219,31 @@ export function SelfCheckIn() {
             ))}
           </select>
 
-          {qrLoading && <p className="text-text-muted text-xs text-center">Memuat QR...</p>}
+          {selectedAdminEv && hasActiveQr && selectedAdminEv.checkin_token && selectedAdminEv.checkin_expires_at && (
+            <div className="bg-white rounded-xl p-4 text-center space-y-3">
+              <p className="text-black text-sm font-medium">{selectedAdminEv.title}</p>
+              <QRCodeSVG value={qrUrl(selectedAdminEv.checkin_token)} size={220} className="mx-auto" />
+              <p className="text-gray-500 text-xs">
+                Berlaku sampai: {new Date(selectedAdminEv.checkin_expires_at).toLocaleString('id-ID')}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => copyLink(selectedAdminEv.checkin_token!)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                >
+                  📋 Salin Link
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
+                >
+                  🖨️ Cetak
+                </button>
+              </div>
+            </div>
+          )}
 
-          {selectedAdminEv && qrTokens.length === 0 && !qrLoading && (
+          {selectedAdminEv && !hasActiveQr && (
             <div className="bg-text/[0.05] rounded-lg p-3 text-center space-y-2">
               <p className="text-text-muted text-xs">Belum ada QR aktif untuk kegiatan ini.</p>
               <a
@@ -237,37 +254,6 @@ export function SelfCheckIn() {
               </a>
             </div>
           )}
-
-          {qrTokens.map((qr, idx) => {
-            const url = qrUrl(qr.token)
-            const expiredAt = new Date(qr.expires_at).toLocaleString('id-ID')
-            return (
-              <div
-                key={qr.token}
-                className={`bg-white rounded-xl p-4 text-center space-y-3 ${idx > 0 ? 'mt-3' : ''}`}
-              >
-                <p className="text-black text-sm font-medium">{selectedAdminEv?.title}</p>
-                <QRCodeSVG value={url} size={220} className="mx-auto" />
-                <p className="text-gray-500 text-xs">
-                  Berlaku sampai: {expiredAt}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => copyLink(qr.token)}
-                    className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
-                  >
-                    📋 Salin Link
-                  </button>
-                  <button
-                    onClick={() => window.print()}
-                    className="flex-1 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg text-xs font-medium hover:bg-gray-200 transition"
-                  >
-                    🖨️ Cetak
-                  </button>
-                </div>
-              </div>
-            )
-          })}
         </div>
       )}
 

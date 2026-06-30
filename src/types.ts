@@ -20,6 +20,8 @@ export interface Event {
   time?: string
   location?: string
   checkin_close_at?: string
+  checkin_token?: string
+  checkin_expires_at?: string
 }
 
 export interface Attendance {

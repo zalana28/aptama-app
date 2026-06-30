@@ -46,11 +46,16 @@ CREATE TABLE IF NOT EXISTS events (
   time time,
   location text,
   checkin_close_at timestamptz,
+  -- QR check-in aktif disimpan langsung di events agar konsisten dan mudah dibaca
+  checkin_token text,
+  checkin_expires_at timestamptz,
   created_at timestamptz DEFAULT now()
 );
 
--- Tambah kolom time jika tabel events sudah ada sebelumnya
+-- Tambah kolom jika tabel events sudah ada sebelumnya
 ALTER TABLE events ADD COLUMN IF NOT EXISTS time time;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS checkin_token text;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS checkin_expires_at timestamptz;
 
 CREATE TABLE IF NOT EXISTS attendances (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -335,6 +340,41 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.generate_qr_token(uuid, text, int) TO anon;
 
+-- Generate QR absen disimpan langsung di kolom events.checkin_token + checkin_expires_at
+-- Supaya halaman Check-in tinggal baca event (sudah punya SELECT public) tanpa RPC tambahan.
+CREATE OR REPLACE FUNCTION public.admin_generate_checkin_qr(
+  p_pin text,
+  p_event_id uuid,
+  p_minutes int DEFAULT 120
+)
+RETURNS TABLE (
+  event_id uuid,
+  checkin_token text,
+  checkin_expires_at timestamptz
+)
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_token text;
+  v_expires timestamptz;
+BEGIN
+  IF NOT public.admin_verify_pin(p_pin) THEN
+    RAISE EXCEPTION 'PIN salah';
+  END IF;
+  v_token := encode(gen_random_bytes(24), 'hex');
+  v_expires := now() + make_interval(mins => p_minutes);
+  UPDATE events
+  SET checkin_token = v_token,
+      checkin_expires_at = v_expires
+  WHERE id = p_event_id;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Kegiatan tidak ditemukan';
+  END IF;
+  RETURN QUERY
+  SELECT p_event_id, v_token, v_expires;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_generate_checkin_qr(text, uuid, int) TO anon;
+
 -- Ambil QR aktif untuk satu kegiatan (untuk ditampilkan di halaman Check-in oleh ketua)
 CREATE OR REPLACE FUNCTION public.get_active_qr_tokens(p_event_id uuid)
 RETURNS TABLE (
@@ -350,16 +390,16 @@ LANGUAGE sql SECURITY DEFINER STABLE AS $$
 $$;
 GRANT EXECUTE ON FUNCTION public.get_active_qr_tokens(uuid) TO anon;
 
--- Resolve token jadi event_id + expires_at (untuk ScanPage agar bisa ambil event dari QR tanpa akses langsung ke qr_tokens)
+-- Resolve token jadi event_id + expires_at (untuk ScanPage agar bisa ambil event dari QR tanpa akses langsung ke tabel)
 CREATE OR REPLACE FUNCTION public.resolve_qr_token(p_token text)
 RETURNS TABLE (
   event_id uuid,
   expires_at timestamptz
 )
 LANGUAGE sql SECURITY DEFINER STABLE AS $$
-  SELECT event_id, expires_at
-  FROM qr_tokens
-  WHERE token = p_token;
+  SELECT id, checkin_expires_at
+  FROM events
+  WHERE checkin_token = p_token;
 $$;
 GRANT EXECUTE ON FUNCTION public.resolve_qr_token(text) TO anon;
 

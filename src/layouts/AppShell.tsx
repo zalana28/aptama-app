@@ -1,7 +1,6 @@
 import { Outlet } from 'react-router-dom'
 import { TopBar } from '../components/TopBar'
 import { BottomNav } from '../components/BottomNav'
-import { FloatingAdminButton } from '../components/FloatingAdminButton'
 
 export function AppShell() {
   return (
@@ -13,7 +12,6 @@ export function AppShell() {
       >
         <Outlet />
       </main>
-      <FloatingAdminButton />
       <BottomNav />
     </div>
   )

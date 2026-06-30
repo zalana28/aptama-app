@@ -16,8 +16,6 @@ const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m
 const ScanQrPage = lazy(() => import('./pages/ScanQrPage').then((m) => ({ default: m.ScanQrPage })))
 const RekapPage = lazy(() => import('./pages/RekapPage').then((m) => ({ default: m.RekapPage })))
 const PengurusPage = lazy(() => import('./pages/PengurusPage').then((m) => ({ default: m.PengurusPage })))
-const ModeKetuaPage = lazy(() => import('./pages/ModeKetuaPage').then((m) => ({ default: m.ModeKetuaPage })))
-const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
 
 // Existing pages
 const Members = lazy(() => import('./pages/Members').then((m) => ({ default: m.Members })))
@@ -92,8 +90,6 @@ function MainApp() {
               <Route path="scan-qr" element={<ScanQrPage />} />
               <Route path="rekap" element={<RekapPage />} />
               <Route path="pengurus" element={<PengurusPage />} />
-              <Route path="mode-ketua" element={<ModeKetuaPage />} />
-              <Route path="admin" element={<AdminDashboardPage />} />
               
               {/* Existing routes */}
               <Route path="anggota" element={<AdminGate><Members /></AdminGate>} />

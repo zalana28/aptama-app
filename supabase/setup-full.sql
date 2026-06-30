@@ -126,6 +126,13 @@ DROP POLICY IF EXISTS "anon_all_attendances" ON attendances;
 DROP POLICY IF EXISTS "anon_all_qr_tokens" ON qr_tokens;
 DROP POLICY IF EXISTS "anon_all_admin_config" ON admin_config;
 
+-- Hapus policy baru (supaya script idempotent aman di-run ulang)
+DROP POLICY IF EXISTS "anon_select_members" ON members;
+DROP POLICY IF EXISTS "anon_select_events" ON events;
+DROP POLICY IF EXISTS "block_all_attendances" ON attendances;
+DROP POLICY IF EXISTS "block_all_qr_tokens" ON qr_tokens;
+DROP POLICY IF EXISTS "block_all_admin_config" ON admin_config;
+
 -- Public read-only untuk members & events
 CREATE POLICY "anon_select_members" ON members FOR SELECT TO anon USING (true);
 CREATE POLICY "anon_select_events" ON events FOR SELECT TO anon USING (true);

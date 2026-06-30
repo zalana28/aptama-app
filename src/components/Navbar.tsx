@@ -16,10 +16,9 @@ export function Navbar() {
       <SkipLink />
       <nav className="sticky top-0 z-40 bg-bg/80 backdrop-blur-xl border-b border-border" aria-label="Navigasi utama">
         <div className="max-w-2xl mx-auto flex items-center justify-between px-4 h-14">
-          {/* Left: Logo + title */}
-          <Link to="/" className="flex items-center gap-2.5" aria-label="Kembali ke Beranda">
+          {/* Left: Logo */}
+          <Link to="/" className="flex items-center" aria-label="Kembali ke Beranda">
             <Logo size={26} />
-            <span className="font-heading font-bold text-sm text-white">Beranda</span>
           </Link>
 
           {/* Right: Theme toggle + Hamburger */}

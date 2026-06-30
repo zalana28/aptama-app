@@ -23,7 +23,7 @@ export function ScanPage() {
   const [loadingModels, setLoadingModels] = useState(false)
 
   useEffect(() => {
-    supabase.from('members').select('*').order('name')
+    supabase.from('members_public').select('id, name, group').order('name')
       .then(({ data }) => setMembers((data ?? []) as Member[]))
   }, [])
 

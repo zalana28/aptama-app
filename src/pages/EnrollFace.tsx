@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import {
   ensureFaceModelsLoaded,
@@ -6,11 +7,17 @@ import {
   captureSelfieBlob,
   uploadSelfie,
 } from '../lib/faceApi'
-import type { Member } from '../types'
+
+type MemberNeedEnroll = {
+  id: string
+  name: string
+  group: string | null
+}
 
 export function EnrollFace() {
+  const queryClient = useQueryClient()
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [members, setMembers] = useState<Member[]>([])
+  const [members, setMembers] = useState<MemberNeedEnroll[]>([])
   const [memberId, setMemberId] = useState('')
   const [loadingModels, setLoadingModels] = useState(true)
   const [cameraOn, setCameraOn] = useState(false)
@@ -21,8 +28,11 @@ export function EnrollFace() {
   useEffect(() => {
     async function load() {
       try {
-        const { data } = await supabase.from('members').select('*').order('name')
-        setMembers((data ?? []) as Member[])
+        const { data } = await supabase
+          .from('members_need_face_enroll')
+          .select('id, name, group')
+          .order('name')
+        setMembers((data ?? []) as MemberNeedEnroll[])
       } catch (err) {
         console.error('Gagal memuat anggota:', err)
       }
@@ -117,7 +127,14 @@ export function EnrollFace() {
       }
 
       console.log('enroll_face berhasil')
+      
+      // Invalidate queries supaya list refresh
+      await queryClient.invalidateQueries({ queryKey: ['members-need-face-enroll'] })
+      await queryClient.invalidateQueries({ queryKey: ['members-public'] })
+      await queryClient.invalidateQueries({ queryKey: ['pending-faces'] })
+      
       setDone(true)
+      setMemberId('')
     } catch (err: any) {
       console.error('Gagal daftar wajah:', err)
       setError('Gagal mendaftarkan wajah: ' + (err?.message ?? 'error tidak diketahui'))
@@ -135,7 +152,17 @@ export function EnrollFace() {
           Wajah terkirim. Tunggu ketua approve supaya bisa dipakai absen.
         </p>
         <button
-          onClick={() => { setDone(false); setMemberId(''); setError('') }}
+          onClick={() => {
+            setDone(false)
+            setMemberId('')
+            setError('')
+            // Reload list anggota yang masih butuh enroll
+            supabase
+              .from('members_need_face_enroll')
+              .select('id, name, group')
+              .order('name')
+              .then(({ data }) => setMembers((data ?? []) as MemberNeedEnroll[]))
+          }}
           className="text-primary text-sm hover:underline"
         >
           Daftarkan wajah lain
@@ -164,9 +191,15 @@ export function EnrollFace() {
             required
           >
             <option value="">— Pilih nama —</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
+            {members.length === 0 ? (
+              <option disabled>Semua anggota sudah daftar</option>
+            ) : (
+              members.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} {m.group ? `(${m.group})` : ''}
+                </option>
+              ))
+            )}
           </select>
         </div>
 

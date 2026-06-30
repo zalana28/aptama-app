@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AdminProvider } from './hooks/AdminProvider'
 import { ThemeProvider } from './hooks/ThemeContext'
-import { Navbar } from './components/Navbar'
+import { AppShell } from './layouts/AppShell'
 import { AdminGate } from './components/AdminGate'
 import { Logo } from './components/Logo'
 import { isConfigured } from './lib/supabase'
@@ -12,11 +12,17 @@ import { SplashScreen } from './components/SplashScreen'
 
 // Lazy-load pages to reduce initial bundle size.
 // Pages use named exports, so we map them to a default export for React.lazy.
-const Home = lazy(() => import('./pages/Home').then((m) => ({ default: m.Home })))
+const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })))
+const ScanQrPage = lazy(() => import('./pages/ScanQrPage').then((m) => ({ default: m.ScanQrPage })))
+const RekapPage = lazy(() => import('./pages/RekapPage').then((m) => ({ default: m.RekapPage })))
+const PengurusPage = lazy(() => import('./pages/PengurusPage').then((m) => ({ default: m.PengurusPage })))
+const ModeKetuaPage = lazy(() => import('./pages/ModeKetuaPage').then((m) => ({ default: m.ModeKetuaPage })))
+const AdminDashboardPage = lazy(() => import('./pages/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })))
+
+// Existing pages
 const Members = lazy(() => import('./pages/Members').then((m) => ({ default: m.Members })))
 const Events = lazy(() => import('./pages/Events').then((m) => ({ default: m.Events })))
 const Attendance = lazy(() => import('./pages/Attendance').then((m) => ({ default: m.Attendance })))
-const Recap = lazy(() => import('./pages/Recap').then((m) => ({ default: m.Recap })))
 const AjukanIzin = lazy(() => import('./pages/AjukanIzin').then((m) => ({ default: m.AjukanIzin })))
 const SelfCheckIn = lazy(() => import('./pages/SelfCheckIn').then((m) => ({ default: m.SelfCheckIn })))
 const GenerateQR = lazy(() => import('./pages/GenerateQR').then((m) => ({ default: m.GenerateQR })))
@@ -78,28 +84,32 @@ function MainApp() {
   return (
     <AdminProvider>
       <BrowserRouter>
-        <div className="min-h-screen bg-bg">
-          <Navbar />
-          <main id="main-content" className="animate-fade-in">
-            <Suspense fallback={<PageLoader />}>
-              <Routes>
-                <Route path="/" element={<Home />} />
-                <Route path="/anggota" element={<AdminGate><Members /></AdminGate>} />
-                <Route path="/kegiatan" element={<AdminGate><Events /></AdminGate>} />
-                <Route path="/absensi" element={<AdminGate><Attendance /></AdminGate>} />
-                <Route path="/generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
-                <Route path="/rekap" element={<Recap />} />
-                <Route path="/izin" element={<AjukanIzin />} />
-                <Route path="/checkin" element={<SelfCheckIn />} />
-                <Route path="/scan" element={<ScanPage />} />
-                <Route path="/daftar-wajah" element={<EnrollFace />} />
-                <Route path="/verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
-                <Route path="/import" element={<AdminGate><ImportData /></AdminGate>} />
-                <Route path="/ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
-              </Routes>
-            </Suspense>
-          </main>
-        </div>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/" element={<AppShell />}>
+              <Route index element={<HomePage />} />
+              <Route path="home" element={<HomePage />} />
+              <Route path="scan-qr" element={<ScanQrPage />} />
+              <Route path="rekap" element={<RekapPage />} />
+              <Route path="pengurus" element={<PengurusPage />} />
+              <Route path="mode-ketua" element={<ModeKetuaPage />} />
+              <Route path="admin" element={<AdminDashboardPage />} />
+              
+              {/* Existing routes */}
+              <Route path="anggota" element={<AdminGate><Members /></AdminGate>} />
+              <Route path="kegiatan" element={<AdminGate><Events /></AdminGate>} />
+              <Route path="absensi" element={<AdminGate><Attendance /></AdminGate>} />
+              <Route path="generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
+              <Route path="izin" element={<AjukanIzin />} />
+              <Route path="checkin" element={<SelfCheckIn />} />
+              <Route path="scan" element={<ScanPage />} />
+              <Route path="daftar-wajah" element={<EnrollFace />} />
+              <Route path="verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
+              <Route path="import" element={<AdminGate><ImportData /></AdminGate>} />
+              <Route path="ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AdminProvider>
   )

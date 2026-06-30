@@ -28,7 +28,7 @@ export function SelfCheckIn() {
   const [adminEventId, setAdminEventId] = useState('')
 
   useEffect(() => {
-    supabase.from('members').select('*').order('name')
+    supabase.from('members_public').select('id, name, group').order('name')
       .then(({ data }) => setMembers((data ?? []) as Member[]))
 
     // Ambil SEMUA kegiatan untuk admin, tapi tetap tandai yang check-in-nya masih buka

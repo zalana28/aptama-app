@@ -13,7 +13,7 @@ export function AjukanIzin() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase.from('members').select('*').order('name')
+    supabase.from('members_public').select('id, name, group').order('name')
       .then(({ data }) => setMembers((data ?? []) as Member[]))
     supabase.from('events').select('*').order('date', { ascending: false })
       .then(({ data }) => setEvents((data ?? []) as Event[]))

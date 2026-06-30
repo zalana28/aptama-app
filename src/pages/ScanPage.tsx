@@ -105,10 +105,8 @@ export function ScanPage() {
 
     const deviceHash = generateDeviceHash()
     const { data: eventData, error: eventError } = await supabase
-      .from('qr_tokens')
-      .select('event_id')
-      .eq('token', token)
-      .single()
+      .rpc('resolve_qr_token', { p_token: token })
+      .single<{ event_id: string; expires_at: string }>()
 
     if (eventError || !eventData) {
       setError('QR tidak valid.')

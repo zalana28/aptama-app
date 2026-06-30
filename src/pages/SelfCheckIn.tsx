@@ -60,12 +60,9 @@ export function SelfCheckIn() {
 
     async function loadQr() {
       setQrLoading(true)
-      const { data, error } = await supabase
-        .from('qr_tokens')
-        .select('token, expires_at, created_at')
-        .eq('event_id', adminEventId)
-        .gte('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false })
+      const { data, error } = await supabase.rpc('get_active_qr_tokens', {
+        p_event_id: adminEventId,
+      })
       if (!error) setQrTokens((data ?? []) as QrToken[])
       setQrLoading(false)
     }

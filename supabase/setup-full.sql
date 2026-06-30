@@ -335,6 +335,34 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.generate_qr_token(uuid, text, int) TO anon;
 
+-- Ambil QR aktif untuk satu kegiatan (untuk ditampilkan di halaman Check-in oleh ketua)
+CREATE OR REPLACE FUNCTION public.get_active_qr_tokens(p_event_id uuid)
+RETURNS TABLE (
+  token text,
+  expires_at timestamptz,
+  created_at timestamptz
+)
+LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT token, expires_at, created_at
+  FROM qr_tokens
+  WHERE event_id = p_event_id AND expires_at > now()
+  ORDER BY created_at DESC;
+$$;
+GRANT EXECUTE ON FUNCTION public.get_active_qr_tokens(uuid) TO anon;
+
+-- Resolve token jadi event_id + expires_at (untuk ScanPage agar bisa ambil event dari QR tanpa akses langsung ke qr_tokens)
+CREATE OR REPLACE FUNCTION public.resolve_qr_token(p_token text)
+RETURNS TABLE (
+  event_id uuid,
+  expires_at timestamptz
+)
+LANGUAGE sql SECURITY DEFINER STABLE AS $$
+  SELECT event_id, expires_at
+  FROM qr_tokens
+  WHERE token = p_token;
+$$;
+GRANT EXECUTE ON FUNCTION public.resolve_qr_token(text) TO anon;
+
 -- Legacy QR scan (tanpa wajah) — tetap ada untuk fallback/manual
 CREATE OR REPLACE FUNCTION public.scan_qr_attendance(p_token text, p_member_id uuid)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$

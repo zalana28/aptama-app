@@ -61,7 +61,7 @@ export function SplashScreen() {
           className="mt-8"
         >
           <h1
-            className="text-[2.75rem] font-extrabold tracking-tight text-white"
+            className="text-[2.75rem] font-extrabold tracking-tight gradient-text"
             style={{ fontFamily: "'Sora', sans-serif" }}
           >
             APTAMA

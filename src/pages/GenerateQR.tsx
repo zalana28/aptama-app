@@ -61,8 +61,10 @@ export function GenerateQR() {
     const url = `${window.location.origin}/scan?token=${result.checkin_token}`
     setQrUrl(url)
 
-    // PENTING: refresh data events agar halaman lain (Check-in) bisa baca QR aktif
+    // PENTING: refresh data events agar halaman lain (Check-in / Scan QR) bisa baca QR aktif
     await qc.invalidateQueries({ queryKey: ['events'] })
+    await qc.invalidateQueries({ queryKey: ['active-qr-events'] })
+    await qc.refetchQueries({ queryKey: ['active-qr-events'] })
   }
 
   function handleCopy() {

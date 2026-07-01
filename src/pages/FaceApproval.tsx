@@ -49,7 +49,9 @@ export function FaceApproval() {
       await queryClient.invalidateQueries({ queryKey: ['pending-faces'] })
       await queryClient.invalidateQueries({ queryKey: ['members-need-face-enroll'] })
       await queryClient.invalidateQueries({ queryKey: ['members-public'] })
-      
+      await queryClient.invalidateQueries({ queryKey: ['members'] })
+      await queryClient.refetchQueries({ queryKey: ['members-public'] })
+
       // Remove dari list lokal (karena sudah approved/rejected, bukan pending lagi)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
     }

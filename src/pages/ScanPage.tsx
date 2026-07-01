@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import {
   loadFaceModels,
@@ -16,23 +17,43 @@ export function ScanPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [members, setMembers] = useState<Member[]>([])
   const [memberId, setMemberId] = useState('')
   const [step, setStep] = useState<'select' | 'face' | 'submitting' | 'done' | 'error'>('select')
   const [error, setError] = useState('')
   const [loadingModels, setLoadingModels] = useState(false)
 
-  useEffect(() => {
-    supabase.from('members_public').select('id, name, group').order('name')
-      .then(({ data }) => setMembers((data ?? []) as Member[]))
-  }, [])
+  const { data: members = [] } = useQuery({
+    queryKey: ['members-public'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('members_public')
+        .select('id, name, group, face_status')
+        .order('name')
+      if (error) throw error
+      return (data ?? []) as Member[]
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
 
   const selectedMember = members.find((m) => m.id === memberId)
+
+  const faceStatus = selectedMember?.face_status
+  const isApproved = faceStatus === 'approved'
+  const isPending = faceStatus === 'pending'
+  const isNotRegistered =
+    !faceStatus || faceStatus === 'none' || faceStatus === null
+
+  console.log('members-public:', members)
+  console.log('selectedMemberId:', memberId)
+  console.log('selectedMember:', selectedMember)
+  console.log('face_status:', selectedMember?.face_status)
 
   async function startFaceStep() {
     if (!selectedMember) return
     if (selectedMember.face_status !== 'approved') {
-      setError('Wajahmu belum terdaftar/disetejui ketua. Daftar wajah dulu.')
+      setError('Wajahmu belum terdaftar/disetujui ketua. Daftar wajah dulu.')
       return
     }
     setError('')
@@ -183,11 +204,27 @@ export function ScanPage() {
             </select>
           </div>
 
+          {selectedMember && isApproved && (
+            <p className="text-green-600 text-sm">
+              Wajah sudah disetujui. Silakan lanjut verifikasi.
+            </p>
+          )}
+          {selectedMember && isPending && (
+            <p className="text-yellow-600 text-sm">
+              Wajahmu sudah terdaftar dan sedang menunggu approve ketua.
+            </p>
+          )}
+          {selectedMember && isNotRegistered && (
+            <p className="text-red-600 text-sm">
+              Wajahmu belum terdaftar. Daftar wajah dulu.
+            </p>
+          )}
+
           {error && <p className="text-danger text-sm">{error}</p>}
 
           <button
             onClick={startFaceStep}
-            disabled={!memberId}
+            disabled={!isApproved}
             className="w-full bg-primary text-white px-4 py-3 rounded-lg text-base font-medium hover:bg-primary-light transition disabled:opacity-50"
           >
             Lanjutkan Verifikasi Wajah

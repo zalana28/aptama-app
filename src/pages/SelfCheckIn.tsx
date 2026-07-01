@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
+import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import {
   loadFaceModels,
@@ -16,8 +17,6 @@ export function SelfCheckIn() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
-  const [members, setMembers] = useState<Member[]>([])
-  const [events, setEvents] = useState<(Event & { is_open: boolean })[]>([])
   const [memberId, setMemberId] = useState('')
   const [eventId, setEventId] = useState('')
   const [step, setStep] = useState<'form' | 'camera' | 'submitting' | 'done' | 'error'>('form')
@@ -27,32 +26,55 @@ export function SelfCheckIn() {
   // Admin QR view
   const [adminEventId, setAdminEventId] = useState('')
 
-  useEffect(() => {
-    supabase.from('members_public').select('id, name, group').order('name')
-      .then(({ data }) => setMembers((data ?? []) as Member[]))
+  const { data: members = [] } = useQuery({
+    queryKey: ['members-public'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('members_public')
+        .select('id, name, group, face_status')
+        .order('name')
+      if (error) throw error
+      return (data ?? []) as Member[]
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
 
-    // Ambil SEMUA kegiatan untuk admin, tapi tetap tandai yang check-in-nya masih buka
-    supabase.from('events').select('*')
-      .order('date', { ascending: false })
-      .then(({ data }) => {
-        const now = Date.now()
-        const mapped = (data ?? []).map((ev: Event) => ({
-          ...ev,
-          is_open: ev.checkin_close_at ? new Date(ev.checkin_close_at).getTime() > now : false,
-        }))
-        setEvents(mapped as (Event & { is_open: boolean })[])
-      })
-  }, [])
-
-  useEffect(() => {
-    // Tidak perlu fetch QR terpisah — QR aktif sudah tersimpan di kolom events.checkin_token
-    // yang akan ikut ter-fetch lewat useEvents() di bawah.
-  }, [isAdmin, adminEventId])
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: false })
+      if (error) throw error
+      const now = Date.now()
+      return (data ?? []).map((ev: Event) => ({
+        ...ev,
+        is_open: ev.checkin_close_at ? new Date(ev.checkin_close_at).getTime() > now : false,
+      })) as (Event & { is_open: boolean })[]
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
 
   const selectedMember = members.find((m) => m.id === memberId)
   const selectedEv = events.find((e) => e.id === eventId)
   const selectedAdminEv = events.find((e) => e.id === adminEventId)
   const openEvents = events.filter((ev) => ev.is_open)
+
+  const faceStatus = selectedMember?.face_status
+  const isApproved = faceStatus === 'approved'
+  const isPending = faceStatus === 'pending'
+  const isNotRegistered =
+    !faceStatus || faceStatus === 'none' || faceStatus === null
+
+  console.log('members-public:', members)
+  console.log('selectedMemberId:', memberId)
+  console.log('selectedMember:', selectedMember)
+  console.log('face_status:', selectedMember?.face_status)
 
   // QR aktif dibaca langsung dari kolom events.checkin_token + checkin_expires_at
   const hasActiveQr = !!(
@@ -61,19 +83,10 @@ export function SelfCheckIn() {
     new Date(selectedAdminEv.checkin_expires_at).getTime() > Date.now()
   )
 
-  // Debug log (hapus setelah bug selesai)
-  if (isAdmin && adminEventId) {
-    console.log('[SelfCheckIn] selectedAdminEv:', selectedAdminEv)
-    console.log('[SelfCheckIn] checkin_token:', selectedAdminEv?.checkin_token)
-    console.log('[SelfCheckIn] checkin_expires_at:', selectedAdminEv?.checkin_expires_at)
-    console.log('[SelfCheckIn] Now:', new Date().toISOString())
-    console.log('[SelfCheckIn] Has active QR:', hasActiveQr)
-  }
-
   async function startCamera() {
     if (!selectedMember) return
     if (selectedMember.face_status !== 'approved') {
-      setError('Wajahmu belum terdaftar/disetejui ketua. Daftar wajah dulu di menu Daftar Wajah.')
+      setError('Wajahmu belum terdaftar/disetujui ketua. Daftar wajah dulu di menu Daftar Wajah.')
       return
     }
     setError('')
@@ -327,11 +340,27 @@ export function SelfCheckIn() {
                 </div>
               )}
 
+              {selectedMember && isApproved && (
+                <p className="text-green-600 text-sm">
+                  Wajah sudah disetujui. Silakan lanjut verifikasi.
+                </p>
+              )}
+              {selectedMember && isPending && (
+                <p className="text-yellow-600 text-sm">
+                  Wajahmu sudah terdaftar dan sedang menunggu approve ketua.
+                </p>
+              )}
+              {selectedMember && isNotRegistered && (
+                <p className="text-red-600 text-sm">
+                  Wajahmu belum terdaftar. Daftar wajah dulu.
+                </p>
+              )}
+
               {error && <p className="text-danger text-sm">{error}</p>}
 
               <button
                 onClick={startCamera}
-                disabled={!memberId || !eventId}
+                disabled={!isApproved || !eventId}
                 className="w-full bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
               >
                 Lanjutkan Verifikasi Wajah

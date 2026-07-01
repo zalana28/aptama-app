@@ -1,7 +1,40 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { QrCode, Scan } from 'lucide-react'
+import { QRCodeSVG } from 'qrcode.react'
+import { supabase } from '../lib/supabase'
+import type { Event } from '../types'
+
+function isQrActive(event: Event) {
+  const expiresAt = event.checkin_expires_at
+  if (!event.checkin_token || !expiresAt) return false
+  return new Date(expiresAt).getTime() > Date.now()
+}
 
 export function ScanQrPage() {
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: ['active-qr-events'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, title, date, checkin_token, checkin_expires_at')
+        .order('date', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as Event[]
+    },
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+  })
+
+  const activeQrEvents = events.filter(isQrActive)
+  const activeQrEvent = activeQrEvents[0] ?? null
+
+  console.log('events from db:', events)
+  console.log('activeQrEvents:', activeQrEvents)
+  console.log('activeQrEvent:', activeQrEvent)
+  console.log('now:', new Date().toISOString())
+
   return (
     <div className="space-y-6 py-6">
       <div className="text-center space-y-2">
@@ -11,6 +44,33 @@ export function ScanQrPage() {
           Scan QR dari ketua, lalu verifikasi wajah untuk absen hadir.
         </p>
       </div>
+
+      {isLoading ? (
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-center">
+          <p className="text-zinc-400">Memuat QR aktif...</p>
+        </div>
+      ) : activeQrEvent ? (
+        <div className="rounded-3xl border border-[#1B7A3D]/40 bg-white/[0.06] p-5 text-center">
+          <h2 className="text-lg font-bold">QR Absen Aktif</h2>
+          <p className="mt-1 text-sm text-zinc-400">{activeQrEvent.title}</p>
+          <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-4">
+            <QRCodeSVG
+              value={`${window.location.origin}/scan?token=${activeQrEvent.checkin_token}`}
+              size={220}
+            />
+          </div>
+          <p className="mt-3 text-xs text-zinc-500">
+            Berlaku sampai:{' '}
+            {new Date(activeQrEvent.checkin_expires_at!).toLocaleString('id-ID')}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-center">
+          <p className="text-zinc-400">
+            Belum ada QR aktif. Ketua perlu generate QR dulu di menu Pengurus.
+          </p>
+        </div>
+      )}
 
       <div className="space-y-3">
         <Link

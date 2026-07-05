@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { getAdminPin } from '../lib/admin'
 
 export function ModeKetuaPage() {
   const navigate = useNavigate()

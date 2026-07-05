@@ -8,14 +8,13 @@ export type VerifiedStatus = 'auto' | 'manual' | 'pending'
 export interface Member {
   id: string
   name: string
+  phone?: string
   group?: string
   face_status?: FaceStatus
   face_enrolled_at?: string
 }
 
-export interface MemberAdmin extends Member {
-  phone?: string
-}
+export interface MemberAdmin extends Member {}
 
 export interface Event {
   id: string

@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAdmin } from '../hooks/useAdmin'
-import { getAdminPin } from '../lib/admin'
 
 export function ChangePin() {
   const { isAdmin } = useAdmin()

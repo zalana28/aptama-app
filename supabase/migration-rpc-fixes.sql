@@ -4,6 +4,8 @@
 -- ============================================================
 
 -- Step 1: Fix admin_change_pin RPC to use admin_config (key-value)
+DROP FUNCTION IF EXISTS admin_change_pin(TEXT, TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION admin_change_pin(
   p_old_pin TEXT,
   p_new_pin TEXT,
@@ -58,6 +60,8 @@ END;
 $$;
 
 -- Step 2: Fix admin_reset_pin RPC to use admin_config (key-value)
+DROP FUNCTION IF EXISTS admin_reset_pin(TEXT, TEXT);
+
 CREATE OR REPLACE FUNCTION admin_reset_pin(
   p_recovery_pin TEXT,
   p_new_pin TEXT

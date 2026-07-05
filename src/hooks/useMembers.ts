@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { getAdminPin } from '../lib/admin'
 import type { Member } from '../types'
 
 export function useMembers() {
@@ -7,19 +8,13 @@ export function useMembers() {
     queryKey: ['members'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('members')
-        .select('*')
+        .from('members_public')
+        .select('id, name, group, face_status, face_enrolled_at, phone')
         .order('name')
       if (error) throw error
       return (data ?? []) as Member[]
     },
   })
-}
-
-function getAdminPin(): string {
-  const pin = localStorage.getItem('aptama_admin_pin')
-  if (!pin) throw new Error('PIN admin belum diset')
-  return pin
 }
 
 export function useAddMember() {

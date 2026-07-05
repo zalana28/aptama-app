@@ -30,11 +30,6 @@ export function ScanQrPage() {
   const activeQrEvents = events.filter(isQrActive)
   const activeQrEvent = activeQrEvents[0] ?? null
 
-  console.log('events from db:', events)
-  console.log('activeQrEvents:', activeQrEvents)
-  console.log('activeQrEvent:', activeQrEvent)
-  console.log('now:', new Date().toISOString())
-
   return (
     <div className="space-y-6 py-6">
       <div className="text-center space-y-2">

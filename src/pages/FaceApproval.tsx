@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
 import { useAdmin } from '../hooks/useAdmin'
+import { getAdminPin } from '../lib/admin'
 
 type MemberPending = {
   id: string
@@ -35,8 +36,8 @@ export function FaceApproval() {
   }, [])
 
   async function handleApprove(memberId: string, approve: boolean) {
-    const pin = localStorage.getItem('aptama_admin_pin')
-    if (!pin) return
+    let pin: string
+    try { pin = getAdminPin() } catch { return }
     setActionId(memberId)
     const { error } = await supabase.rpc('admin_approve_face', {
       p_pin: pin,
@@ -45,14 +46,11 @@ export function FaceApproval() {
     })
     setActionId(null)
     if (!error) {
-      // Invalidate queries supaya list pending refresh
       await queryClient.invalidateQueries({ queryKey: ['pending-faces'] })
       await queryClient.invalidateQueries({ queryKey: ['members-need-face-enroll'] })
       await queryClient.invalidateQueries({ queryKey: ['members-public'] })
       await queryClient.invalidateQueries({ queryKey: ['members'] })
       await queryClient.refetchQueries({ queryKey: ['members-public'] })
-
-      // Remove dari list lokal (karena sudah approved/rejected, bukan pending lagi)
       setMembers((prev) => prev.filter((m) => m.id !== memberId))
     }
   }
@@ -110,25 +108,22 @@ export function FaceApproval() {
                   </p>
                 )}
               </div>
-              {/* Semua di list ini adalah pending, jadi langsung tampilkan tombol */}
-              {(
-                <div className="flex flex-col gap-2 shrink-0">
-                  <button
-                    onClick={() => handleApprove(m.id, true)}
-                    disabled={actionId === m.id}
-                    className="bg-success text-bg px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-success/80 transition disabled:opacity-50"
-                  >
-                    {actionId === m.id ? '...' : 'Setuju'}
-                  </button>
-                  <button
-                    onClick={() => handleApprove(m.id, false)}
-                    disabled={actionId === m.id}
-                    className="bg-danger text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-danger/80 transition disabled:opacity-50"
-                  >
-                    Tolak
-                  </button>
-                </div>
-              )}
+              <div className="flex flex-col gap-2 shrink-0">
+                <button
+                  onClick={() => handleApprove(m.id, true)}
+                  disabled={actionId === m.id}
+                  className="bg-success text-bg px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-success/80 transition disabled:opacity-50"
+                >
+                  {actionId === m.id ? '...' : 'Setuju'}
+                </button>
+                <button
+                  onClick={() => handleApprove(m.id, false)}
+                  disabled={actionId === m.id}
+                  className="bg-danger text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-danger/80 transition disabled:opacity-50"
+                >
+                  Tolak
+                </button>
+              </div>
             </div>
           ))}
         </div>

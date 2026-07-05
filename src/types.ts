@@ -1,3 +1,6 @@
+// Public-safe member type — does NOT include biometric data (face_descriptor).
+// Use this for all frontend reads. face_descriptor is only accessible
+// via the server-side RPC `get_member_descriptor`.
 export type AttendanceStatus = 'hadir' | 'izin' | 'alfa'
 export type FaceStatus = 'none' | 'pending' | 'approved'
 export type VerifiedStatus = 'auto' | 'manual' | 'pending'
@@ -6,11 +9,12 @@ export interface Member {
   id: string
   name: string
   group?: string
-  phone?: string
-  face_descriptor?: number[]
   face_status?: FaceStatus
   face_enrolled_at?: string
-  face_selfie_url?: string
+}
+
+export interface MemberAdmin extends Member {
+  phone?: string
 }
 
 export interface Event {

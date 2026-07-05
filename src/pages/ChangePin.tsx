@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAdmin } from '../hooks/useAdmin'
+import { getAdminPin } from '../lib/admin'
 
 export function ChangePin() {
   const { isAdmin } = useAdmin()
@@ -40,13 +41,12 @@ export function ChangePin() {
       })
 
       if (rpcError) {
-        console.error('Gagal ganti PIN:', rpcError)
         setError(rpcError.message || 'Gagal mengganti PIN.')
         return
       }
 
-      // Update PIN di localStorage supaya session admin tetap jalan
-      localStorage.setItem('aptama_admin_pin', newPin)
+      // Update PIN in session storage so current session keeps working
+      sessionStorage.setItem('aptama_admin_pin', newPin)
 
       setSuccess(true)
       setOldPin('')
@@ -54,7 +54,6 @@ export function ChangePin() {
       setConfirmPin('')
       setRecoveryPin('')
     } catch (err: any) {
-      console.error('Gagal ganti PIN:', err)
       setError('Gagal mengganti PIN: ' + (err?.message ?? 'error tidak diketahui'))
     } finally {
       setLoading(false)

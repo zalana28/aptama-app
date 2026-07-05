@@ -6,18 +6,16 @@ import { AdminProvider } from './hooks/AdminProvider'
 import { ThemeProvider } from './hooks/ThemeContext'
 import { AppShell } from './layouts/AppShell'
 import { AdminGate } from './components/AdminGate'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Logo } from './components/Logo'
 import { isConfigured } from './lib/supabase'
 import { SplashScreen } from './components/SplashScreen'
 
 // Lazy-load pages to reduce initial bundle size.
-// Pages use named exports, so we map them to a default export for React.lazy.
 const HomePage = lazy(() => import('./pages/HomePage').then((m) => ({ default: m.HomePage })))
 const ScanQrPage = lazy(() => import('./pages/ScanQrPage').then((m) => ({ default: m.ScanQrPage })))
 const RekapPage = lazy(() => import('./pages/RekapPage').then((m) => ({ default: m.RekapPage })))
 const PengurusPage = lazy(() => import('./pages/PengurusPage').then((m) => ({ default: m.PengurusPage })))
-
-// Existing pages
 const Members = lazy(() => import('./pages/Members').then((m) => ({ default: m.Members })))
 const Events = lazy(() => import('./pages/Events').then((m) => ({ default: m.Events })))
 const Attendance = lazy(() => import('./pages/Attendance').then((m) => ({ default: m.Attendance })))
@@ -30,7 +28,15 @@ const FaceApproval = lazy(() => import('./pages/FaceApproval').then((m) => ({ de
 const ImportData = lazy(() => import('./pages/ImportData').then((m) => ({ default: m.ImportData })))
 const ChangePin = lazy(() => import('./pages/ChangePin').then((m) => ({ default: m.ChangePin })))
 
-const queryClient = new QueryClient()
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 60_000,
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+})
 const SPLASH_DURATION_MS = 3000
 
 function SetupNotice() {
@@ -55,25 +61,34 @@ function PageLoader() {
   )
 }
 
+function NotFound() {
+  return (
+    <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
+      <div className="text-5xl">🔍</div>
+      <h1 className="text-xl font-bold">Halaman Tidak Ditemukan</h1>
+      <p className="text-text-muted text-sm">
+        URL yang kamu buka tidak valid.
+      </p>
+      <a href="/" className="inline-block text-primary text-sm hover:underline">
+        ← Kembali ke Beranda
+      </a>
+    </div>
+  )
+}
+
 function useSplash() {
   const [showSplash, setShowSplash] = useState(true)
-
   useEffect(() => {
     const timer = setTimeout(() => setShowSplash(false), SPLASH_DURATION_MS)
     return () => clearTimeout(timer)
   }, [])
-
   return showSplash
 }
 
 function MainApp() {
   if (!isConfigured) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.4 }}
-      >
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
         <SetupNotice />
       </motion.div>
     )
@@ -90,8 +105,6 @@ function MainApp() {
               <Route path="scan-qr" element={<ScanQrPage />} />
               <Route path="rekap" element={<RekapPage />} />
               <Route path="pengurus" element={<PengurusPage />} />
-              
-              {/* Existing routes */}
               <Route path="anggota" element={<AdminGate><Members /></AdminGate>} />
               <Route path="kegiatan" element={<AdminGate><Events /></AdminGate>} />
               <Route path="absensi" element={<AdminGate><Attendance /></AdminGate>} />
@@ -103,6 +116,7 @@ function MainApp() {
               <Route path="verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
               <Route path="import" element={<AdminGate><ImportData /></AdminGate>} />
               <Route path="ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
         </Suspense>
@@ -113,17 +127,18 @@ function MainApp() {
 
 function App() {
   const showSplash = useSplash()
-
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AnimatePresence mode="wait">
-          {showSplash ? (
-            <SplashScreen key="splash" />
-          ) : (
-            <MainApp key="main" />
-          )}
-        </AnimatePresence>
+        <ErrorBoundary>
+          <AnimatePresence mode="wait">
+            {showSplash ? (
+              <SplashScreen key="splash" />
+            ) : (
+              <MainApp key="main" />
+            )}
+          </AnimatePresence>
+        </ErrorBoundary>
       </ThemeProvider>
     </QueryClientProvider>
   )

@@ -71,11 +71,6 @@ export function SelfCheckIn() {
   const isNotRegistered =
     !faceStatus || faceStatus === 'none' || faceStatus === null
 
-  console.log('members-public:', members)
-  console.log('selectedMemberId:', memberId)
-  console.log('selectedMember:', selectedMember)
-  console.log('face_status:', selectedMember?.face_status)
-
   // QR aktif dibaca langsung dari kolom events.checkin_token + checkin_expires_at
   const hasActiveQr = !!(
     selectedAdminEv?.checkin_token &&
@@ -109,7 +104,7 @@ export function SelfCheckIn() {
     }
   }
 
-  async function captureSelfieBlob(): Promise<Blob | null> {
+  async function captureSelfie(): Promise<Blob | null> {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return null
@@ -118,8 +113,8 @@ export function SelfCheckIn() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    return new Promise((resolve) => {
-      canvas.toBlob((blob) => resolve(blob ?? null), 'image/jpeg', 0.85)
+    return new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b ?? null), 'image/jpeg', 0.85)
     })
   }
 
@@ -151,7 +146,7 @@ export function SelfCheckIn() {
       return
     }
 
-    const blob = await captureSelfieBlob()
+    const blob = await captureSelfie()
     let selfiePath: string | null = null
     if (blob) {
       selfiePath = await uploadSelfie(supabase, blob, `face-checkin/${selectedMember.id}/${Date.now()}.jpg`)

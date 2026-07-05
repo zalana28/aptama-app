@@ -24,7 +24,7 @@ export function GenerateQR() {
     setError('')
     setLoading(true)
 
-    const pin = localStorage.getItem('aptama_admin_pin')
+  const pin = sessionStorage.getItem('aptama_admin_pin')
     if (!pin) {
       setError('PIN admin tidak ditemukan. Login ulang.')
       setLoading(false)
@@ -53,8 +53,6 @@ export function GenerateQR() {
       setError('Token QR gagal dibuat.')
       return
     }
-
-    console.log('[GenerateQR] QR tersimpan di events:', result)
 
     setToken(result.checkin_token)
     setExpiresAt(result.checkin_expires_at)

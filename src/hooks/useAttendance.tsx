@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { getAdminPin } from '../lib/admin'
 import { useAdmin } from './useAdmin'
 import type { Attendance, AttendanceStatus } from '../types'
 
@@ -28,23 +29,15 @@ export function useAdminAttendanceByEvent(eventId: string) {
   return useQuery({
     queryKey: ['admin_attendance', eventId, isAdmin],
     queryFn: async () => {
-      const pin = localStorage.getItem('aptama_admin_pin')
-      if (!pin) throw new Error('PIN admin belum diset')
       const { data, error } = await supabase.rpc('admin_get_attendance', {
         p_event_id: eventId,
-        p_pin: pin,
+        p_pin: getAdminPin(),
       })
       if (error) throw error
       return (data ?? []) as Attendance[]
     },
     enabled: !!eventId && isAdmin,
   })
-}
-
-function getAdminPin(): string {
-  const pin = localStorage.getItem('aptama_admin_pin')
-  if (!pin) throw new Error('PIN admin belum diset')
-  return pin
 }
 
 export function useUpsertAttendance() {

@@ -45,11 +45,6 @@ export function ScanPage() {
   const isNotRegistered =
     !faceStatus || faceStatus === 'none' || faceStatus === null
 
-  console.log('members-public:', members)
-  console.log('selectedMemberId:', memberId)
-  console.log('selectedMember:', selectedMember)
-  console.log('face_status:', selectedMember?.face_status)
-
   async function startFaceStep() {
     if (!selectedMember) return
     if (selectedMember.face_status !== 'approved') {
@@ -76,7 +71,7 @@ export function ScanPage() {
     }
   }
 
-  async function captureSelfieBlob(): Promise<Blob | null> {
+  async function captureSelfie(): Promise<Blob | null> {
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return null
@@ -118,7 +113,7 @@ export function ScanPage() {
       return
     }
 
-    const blob = await captureSelfieBlob()
+    const blob = await captureSelfie()
     let selfiePath: string | null = null
     if (blob) {
       selfiePath = await uploadSelfie(supabase, blob, `face-checkin/${selectedMember.id}/${Date.now()}.jpg`)

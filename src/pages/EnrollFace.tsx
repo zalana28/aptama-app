@@ -34,7 +34,7 @@ export function EnrollFace() {
           .order('name')
         setMembers((data ?? []) as MemberNeedEnroll[])
       } catch (err) {
-        console.error('Gagal memuat anggota:', err)
+        // Failed to load members — list will be empty
       }
     }
     load()
@@ -57,7 +57,6 @@ export function EnrollFace() {
         }
         setCameraOn(true)
       } catch (err) {
-        console.error('Gagal akses kamera:', err)
         setError('Tidak bisa akses kamera. Pastikan izin kamera diizinkan.')
         setLoadingModels(false)
       }
@@ -86,11 +85,8 @@ export function EnrollFace() {
     setSubmitting(true)
 
     try {
-      console.log('memberId:', memberId)
-
       await ensureFaceModelsLoaded()
       const descriptor = await getDescriptor(videoRef.current)
-      console.log('descriptor:', descriptor ? `terdeteksi (${descriptor.length})` : 'tidak terdeteksi')
 
       if (!descriptor) {
         setError('Wajah tidak terdeteksi. Coba di tempat terang dan hadapkan wajah ke kamera.')
@@ -98,36 +94,29 @@ export function EnrollFace() {
       }
 
       const descriptorArray = Array.from(descriptor)
-      console.log('descriptor length:', descriptorArray.length)
 
       const selfieBlob = await captureSelfieBlob(videoRef.current)
       const filePath = `face-enroll/${memberId}/${Date.now()}.jpg`
-      console.log('selfie path:', filePath)
 
       let uploadedPath: string
       try {
         uploadedPath = await uploadSelfie(supabase, selfieBlob, filePath)
-        console.log('uploaded path:', uploadedPath)
       } catch (uploadErr: any) {
-        console.error('Upload selfie gagal:', uploadErr)
         setError('Gagal upload selfie: ' + (uploadErr?.message ?? 'cek Storage RLS / bucket'))
         return
       }
 
       const { error: rpcError } = await supabase.rpc('enroll_face', {
         p_member_id: memberId,
-        p_descriptor: descriptorArray as never,
+        p_descriptor: descriptorArray,
         p_selfie_url: uploadedPath,
       })
 
       if (rpcError) {
-        console.error('RPC enroll_face gagal:', rpcError)
         setError('Gagal menyimpan data wajah: ' + (rpcError.message || 'RPC error'))
         return
       }
 
-      console.log('enroll_face berhasil')
-      
       // Invalidate queries supaya list refresh
       await queryClient.invalidateQueries({ queryKey: ['members-need-face-enroll'] })
       await queryClient.invalidateQueries({ queryKey: ['members-public'] })
@@ -136,7 +125,6 @@ export function EnrollFace() {
       setDone(true)
       setMemberId('')
     } catch (err: any) {
-      console.error('Gagal daftar wajah:', err)
       setError('Gagal mendaftarkan wajah: ' + (err?.message ?? 'error tidak diketahui'))
     } finally {
       setSubmitting(false)

@@ -4,13 +4,13 @@ import './index.css'
 import App from './App.tsx'
 import { registerSW } from 'virtual:pwa-register'
 
-// Register service worker
+// Register service worker via vite-plugin-pwa (single source of truth)
 registerSW({
   onNeedRefresh() {
-    console.log('[PWA] New content available, please refresh.')
+    // New content available — could show UI prompt to user
   },
   onOfflineReady() {
-    console.log('[PWA] App ready to work offline.')
+    // App ready to work offline
   },
 })
 
@@ -19,17 +19,3 @@ createRoot(document.getElementById('root')!).render(
     <App />
   </StrictMode>,
 )
-
-// Register service worker for PWA
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw.js')
-      .then((registration) => {
-        console.log('SW registered:', registration.scope)
-      })
-      .catch((error) => {
-        console.error('SW registration failed:', error)
-      })
-  })
-}

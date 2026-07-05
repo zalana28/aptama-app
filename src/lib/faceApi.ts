@@ -37,7 +37,16 @@ export function faceDistance(a: number[], b: number[]): number {
 }
 
 export function generateDeviceHash(): string {
-  const raw = navigator.userAgent + (navigator.hardwareConcurrency ?? '') + screen.width + 'x' + screen.height
+  // Combine multiple signals for a more stable fingerprint.
+  // This is NOT a substitute for server-side rate limiting.
+  const raw = [
+    navigator.userAgent,
+    String(navigator.hardwareConcurrency ?? ''),
+    String(navigator.maxTouchPoints ?? ''),
+    `${screen.width}x${screen.height}`,
+    String(screen.colorDepth),
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ].join('|')
   let hash = 0
   for (let i = 0; i < raw.length; i++) {
     const char = raw.charCodeAt(i)
@@ -76,7 +85,6 @@ export async function uploadSelfie(
     upsert: true,
   })
   if (error) {
-    console.error('Upload selfie gagal:', error)
     throw new Error(error.message || 'Gagal upload selfie')
   }
   if (!data?.path) {

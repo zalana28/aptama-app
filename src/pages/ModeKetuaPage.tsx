@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { getAdminPin } from '../lib/admin'
 
 export function ModeKetuaPage() {
   const navigate = useNavigate()
@@ -28,13 +29,12 @@ export function ModeKetuaPage() {
       if (rpcError) throw rpcError
 
       if (data === true) {
-        localStorage.setItem('aptama_admin_pin', pin)
+        sessionStorage.setItem('aptama_admin_pin', pin)
         navigate('/admin')
       } else {
         setError('PIN salah')
       }
     } catch (err: any) {
-      console.error('Verifikasi PIN gagal:', err)
       setError('Gagal verifikasi PIN: ' + (err?.message || 'error'))
     } finally {
       setLoading(false)

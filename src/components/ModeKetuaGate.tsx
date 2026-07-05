@@ -33,8 +33,7 @@ export function ModeKetuaGate() {
         setError('PIN salah')
       }
     } catch (err: any) {
-      console.error('Gagal masuk Mode Ketua:', err)
-      setError('Gagal masuk Mode Ketua: ' + (err?.message || 'error'))
+      setError('Gagal verifikasi: ' + (err?.message || 'error'))
     } finally {
       setLoading(false)
     }
@@ -44,7 +43,7 @@ export function ModeKetuaGate() {
     <div className="min-h-[70vh] flex items-center justify-center px-4 py-6">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-3">
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#1B7A3D]/15 text-[#1B7A3D]">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-primary/15 text-primary">
             <KeyRound size={32} />
           </div>
           <h1 className="text-2xl font-bold">Mode Ketua</h1>
@@ -81,7 +80,7 @@ export function ModeKetuaGate() {
         </form>
 
         <p className="text-xs text-text-muted text-center">
-          PIN default: 1234 (segera ganti setelah masuk)
+          Ganti PIN default segera setelah login pertama kali.
         </p>
       </div>
     </div>

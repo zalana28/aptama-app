@@ -1,12 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { getAdminPin } from '../lib/admin'
 import type { Event } from '../types'
-
-function getAdminPin(): string {
-  const pin = localStorage.getItem('aptama_admin_pin')
-  if (!pin) throw new Error('PIN admin belum diset')
-  return pin
-}
 
 export function useEvents() {
   return useQuery({

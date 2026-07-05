@@ -8,6 +8,7 @@ import {
   faceDistance,
   generateDeviceHash,
   uploadSelfie,
+  captureSelfieWithCanvas,
 } from '../lib/faceApi'
 import { useAdmin } from '../hooks/useAdmin'
 import type { Member, Event } from '../types'
@@ -105,17 +106,8 @@ export function SelfCheckIn() {
   }
 
   async function captureSelfie(): Promise<Blob | null> {
-    const video = videoRef.current
-    const canvas = canvasRef.current
-    if (!video || !canvas) return null
-    canvas.width = video.videoWidth || 640
-    canvas.height = video.videoHeight || 480
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-    return new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((b) => resolve(b ?? null), 'image/jpeg', 0.85)
-    })
+    if (!videoRef.current || !canvasRef.current) return null
+    return captureSelfieWithCanvas(videoRef.current, canvasRef.current)
   }
 
   async function handleSubmit() {
@@ -139,7 +131,13 @@ export function SelfCheckIn() {
       return
     }
 
-    const score = faceDistance(live, stored.data as number[])
+    const storedData = stored.data
+    if (!Array.isArray(storedData)) {
+      setError('Data wajah tidak valid.')
+      setStep('camera')
+      return
+    }
+    const score = faceDistance(live, storedData as number[])
     if (score > 0.5) {
       setError('Wajah tidak cocok. Coba lagi atau laporkan ke ketua.')
       setStep('error')

@@ -153,17 +153,8 @@ export function Events() {
             className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           {errorMsg && (
-            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2 space-y-1">
+            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
               <p className="text-danger text-xs">⚠️ {errorMsg}</p>
-              <p className="text-text-muted text-[10px]">
-                Diagnostik: jalanin query ini di Supabase SQL Editor untuk cek status RLS:
-              </p>
-              <code className="block bg-bg-input text-text-muted text-[10px] px-2 py-1 rounded font-mono whitespace-pre">
-                SELECT relname, relrowsecurity{'\n'}FROM pg_class{'\n'}WHERE relname IN ('members','events','attendances');
-              </code>
-              <p className="text-text-muted text-[10px]">
-                Kalau relrowsecurity = true, RLS aktif — pastikan setup-full.sql versi terbaru sudah dijalankan.
-              </p>
             </div>
           )}
           <div className="flex gap-2">

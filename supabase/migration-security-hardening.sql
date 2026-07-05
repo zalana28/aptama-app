@@ -1,23 +1,21 @@
 -- ============================================================
 -- MIGRATION: Security hardening (apply to Supabase SQL Editor)
+-- Fully idempotent — safe to re-run.
 -- ============================================================
+
 -- 1. Tighten RLS on members table — anon should only read members_public view
--- 2. Add phone column to members_public view
--- 3. Remove qr_tokens table (consolidated to events.checkin_token)
--- 4. Add rate limiting to admin_verify_pin RPC
--- ============================================================
-
--- 1. Drop the overly permissive anon SELECT policy on members table
 DROP POLICY IF EXISTS anon_select_members ON members;
+DROP POLICY IF EXISTS anon_select_members_limited ON members;
 
--- Create a restrictive policy: anon can only select if face_status is needed
--- for check-in flow. They should use members_public for all other reads.
 CREATE POLICY anon_select_members_limited ON members
   FOR SELECT TO anon
   USING (face_status IN ('pending', 'approved'));
 
 -- 2. Recreate members_public view with phone column
-CREATE OR REPLACE VIEW members_public AS
+-- CASCADE drops any objects that depend on the view (then we recreate them)
+DROP VIEW IF EXISTS members_public CASCADE;
+
+CREATE VIEW members_public AS
 SELECT
   id,
   name,

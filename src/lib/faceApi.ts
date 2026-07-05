@@ -75,6 +75,21 @@ export async function captureSelfieBlob(video: HTMLVideoElement): Promise<Blob> 
   })
 }
 
+/** Capture selfie using existing canvas ref (avoids duplicate canvas logic) */
+export async function captureSelfieWithCanvas(
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+): Promise<Blob | null> {
+  canvas.width = video.videoWidth || 640
+  canvas.height = video.videoHeight || 480
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return null
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob ?? null), 'image/jpeg', 0.85)
+  })
+}
+
 export async function uploadSelfie(
   supabase: SupabaseClient,
   blob: Blob,

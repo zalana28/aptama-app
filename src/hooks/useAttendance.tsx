@@ -22,7 +22,7 @@ export function useAttendanceByEvent(eventId: string) {
 /**
  * Ketua-only: ambil attendance dengan kolom `note` (alasan izin).
  * Memanggil RPC `admin_get_attendance` yang verify PIN server-side.
- * Hanya enabled jika user adalah admin DAN PIN ada di localStorage.
+ * Hanya enabled jika user adalah admin DAN PIN ada di sessionStorage.
  */
 export function useAdminAttendanceByEvent(eventId: string) {
   const { isAdmin } = useAdmin()

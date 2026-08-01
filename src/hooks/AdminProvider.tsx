@@ -1,33 +1,54 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { AdminContext } from './AdminContext'
-
-const STORAGE_KEY = 'aptama_admin_verified'
+import { setAdminSession, clearAdminSession, hasAdminSession } from '../lib/admin'
 
 export function AdminProvider({ children }: { children: ReactNode }) {
-  const [isAdmin, setIsAdmin] = useState(() => {
-    return !!sessionStorage.getItem(STORAGE_KEY)
-  })
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => hasAdminSession())
 
-  // Re-verify on mount — session-only, no persistent flag
+  // Re-verify the stored token against the server on mount (session-only,
+  // never trust the frontend flag alone).
   useEffect(() => {
-    const verified = sessionStorage.getItem(STORAGE_KEY)
-    if (!verified) return
+    if (!hasAdminSession()) return
+    const token = sessionStorage.getItem('aptama_admin_token')
+    if (!token) return
+    let cancelled = false
+    void (async () => {
+      try {
+        const { data } = await supabase.rpc('admin_validate_session', { p_token: token })
+        if (cancelled) return
+        if (data !== true) {
+          clearAdminSession()
+          setIsAdmin(false)
+        }
+      } catch {
+        if (cancelled) return
+        clearAdminSession()
+        setIsAdmin(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function login(pin: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('admin_verify_pin', { p_pin: pin })
-    if (error || data !== true) return false
-    sessionStorage.setItem(STORAGE_KEY, '1')
-    sessionStorage.setItem('aptama_admin_pin', pin)
+    const { data, error } = await supabase.rpc('admin_login', { p_pin: pin })
+    if (error || !data) return false
+    const session = data as { token?: string; expires_at?: string }
+    if (!session.token) return false
+    setAdminSession(session.token, session.expires_at ?? '')
     setIsAdmin(true)
     return true
   }
 
   function logout() {
-    sessionStorage.removeItem(STORAGE_KEY)
-    sessionStorage.removeItem('aptama_admin_pin')
+    const token = sessionStorage.getItem('aptama_admin_token')
+    clearAdminSession()
     setIsAdmin(false)
+    if (token) {
+      supabase.rpc('admin_logout', { p_token: token }).then(() => {}, () => {})
+    }
   }
 
   return (

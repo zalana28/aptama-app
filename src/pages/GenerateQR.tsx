@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
 import { useEvents } from '../hooks/useEvents'
 import { useAdmin } from '../hooks/useAdmin'
+import { getAdminToken } from '../lib/admin'
 import { supabase } from '../lib/supabase'
 
 export function GenerateQR() {
@@ -24,15 +25,17 @@ export function GenerateQR() {
     setError('')
     setLoading(true)
 
-  const pin = sessionStorage.getItem('aptama_admin_pin')
-    if (!pin) {
-      setError('PIN admin tidak ditemukan. Login ulang.')
+    let token: string
+    try {
+      token = getAdminToken()
+    } catch (err: any) {
+      setError(err?.message || 'Sesi admin berakhir. Login ulang.')
       setLoading(false)
       return
     }
 
     const { data, error: rpcError } = await supabase.rpc('admin_generate_checkin_qr', {
-      p_pin: pin,
+      p_token: token,
       p_event_id: selectedEvent,
       p_minutes: duration,
     })

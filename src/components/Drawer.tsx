@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Home, LogIn, FileText, BarChart3, QrCode, KeyRound, Users, Calendar, Lock, Settings, ShieldCheck, Sun, Moon } from 'lucide-react'
+import { X, Home, LogIn, FileText, BarChart3, QrCode, KeyRound, Users, Calendar, Lock, Settings, Sun, Moon } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAdmin } from '../hooks/useAdmin'
 import { useTheme } from '../hooks/useTheme'
@@ -19,7 +19,6 @@ const publicLinks = [
 
 const adminLinks = [
   { to: '/generate-qr', label: 'QR Absen', icon: QrCode },
-  { to: '/verifikasi-wajah', label: 'Verifikasi Wajah', icon: ShieldCheck },
   { to: '/anggota', label: 'Kelola Anggota', icon: Users },
   { to: '/kegiatan', label: 'Kelola Kegiatan', icon: Calendar },
   { to: '/ganti-pin', label: 'Ganti PIN', icon: Settings },

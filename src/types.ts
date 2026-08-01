@@ -1,20 +1,18 @@
-// Public-safe member type — does NOT include biometric data (face_descriptor).
-// Use this for all frontend reads. face_descriptor is only accessible
-// via the server-side RPC `get_member_descriptor`.
 export type AttendanceStatus = 'hadir' | 'izin' | 'alfa'
-export type FaceStatus = 'none' | 'pending' | 'approved'
-export type VerifiedStatus = 'auto' | 'manual' | 'pending'
+
+export type AttendanceSource = 'member_signature' | 'admin_manual' | 'izin' | 'legacy'
 
 export interface Member {
   id: string
   name: string
-  phone?: string
   group?: string
-  face_status?: FaceStatus
-  face_enrolled_at?: string
 }
 
-export interface MemberAdmin extends Member {}
+export interface MemberPublic {
+  id: string
+  name: string
+  group?: string
+}
 
 export interface Event {
   id: string
@@ -33,9 +31,26 @@ export interface Attendance {
   member_id: string
   status: AttendanceStatus
   note?: string
-  selfie_url?: string
-  device_hash?: string
-  face_match_score?: number
-  verified_status: VerifiedStatus
+  attendance_source?: AttendanceSource
+  signature_path?: string
+  check_in_at?: string
   submitted_at?: string
+  verified_status?: string
+  verified_by?: string
+}
+
+export interface AdminAttendanceRow extends Attendance {
+  member_name: string
+  member_group?: string
+}
+
+export interface QrValidation {
+  event_id: string
+  title: string
+  date: string
+  time?: string
+  location?: string
+  checkin_expires_at?: string
+  is_valid: boolean
+  error_message?: string
 }

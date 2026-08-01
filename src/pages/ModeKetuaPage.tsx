@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { useAdmin } from '../hooks/useAdmin'
 
 export function ModeKetuaPage() {
   const navigate = useNavigate()
+  const { login } = useAdmin()
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -21,14 +22,8 @@ export function ModeKetuaPage() {
     setLoading(true)
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('admin_verify_pin', {
-        p_pin: pin,
-      })
-
-      if (rpcError) throw rpcError
-
-      if (data === true) {
-        sessionStorage.setItem('aptama_admin_pin', pin)
+      const ok = await login(pin)
+      if (ok) {
         navigate('/admin')
       } else {
         setError('PIN salah')

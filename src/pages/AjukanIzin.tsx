@@ -15,7 +15,7 @@ export function AjukanIzin() {
   useEffect(() => {
     supabase.from('members_public').select('id, name, group').order('name')
       .then(({ data }) => setMembers((data ?? []) as Member[]))
-    supabase.from('events').select('*').order('date', { ascending: false })
+    supabase.from('events_public').select('id, title, date, time, location, checkin_close_at, created_at').order('date', { ascending: false })
       .then(({ data }) => setEvents((data ?? []) as Event[]))
   }, [])
 

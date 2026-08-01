@@ -20,11 +20,9 @@ const Members = lazy(() => import('./pages/Members').then((m) => ({ default: m.M
 const Events = lazy(() => import('./pages/Events').then((m) => ({ default: m.Events })))
 const Attendance = lazy(() => import('./pages/Attendance').then((m) => ({ default: m.Attendance })))
 const AjukanIzin = lazy(() => import('./pages/AjukanIzin').then((m) => ({ default: m.AjukanIzin })))
-const SelfCheckIn = lazy(() => import('./pages/SelfCheckIn').then((m) => ({ default: m.SelfCheckIn })))
+const CheckInPage = lazy(() => import('./pages/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 const GenerateQR = lazy(() => import('./pages/GenerateQR').then((m) => ({ default: m.GenerateQR })))
 const ScanPage = lazy(() => import('./pages/ScanPage').then((m) => ({ default: m.ScanPage })))
-const EnrollFace = lazy(() => import('./pages/EnrollFace').then((m) => ({ default: m.EnrollFace })))
-const FaceApproval = lazy(() => import('./pages/FaceApproval').then((m) => ({ default: m.FaceApproval })))
 const ImportData = lazy(() => import('./pages/ImportData').then((m) => ({ default: m.ImportData })))
 const ChangePin = lazy(() => import('./pages/ChangePin').then((m) => ({ default: m.ChangePin })))
 
@@ -110,10 +108,8 @@ function MainApp() {
               <Route path="absensi" element={<AdminGate><Attendance /></AdminGate>} />
               <Route path="generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
               <Route path="izin" element={<AjukanIzin />} />
-              <Route path="checkin" element={<SelfCheckIn />} />
+              <Route path="checkin" element={<CheckInPage />} />
               <Route path="scan" element={<ScanPage />} />
-              <Route path="daftar-wajah" element={<EnrollFace />} />
-              <Route path="verifikasi-wajah" element={<AdminGate><FaceApproval /></AdminGate>} />
               <Route path="import" element={<AdminGate><ImportData /></AdminGate>} />
               <Route path="ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />
               <Route path="*" element={<NotFound />} />

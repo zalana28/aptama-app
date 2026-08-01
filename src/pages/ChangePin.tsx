@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAdmin } from '../hooks/useAdmin'
+import { getAdminToken } from '../lib/admin'
 
 export function ChangePin() {
   const { isAdmin } = useAdmin()
-  const [oldPin, setOldPin] = useState('')
   const [newPin, setNewPin] = useState('')
   const [confirmPin, setConfirmPin] = useState('')
   const [recoveryPin, setRecoveryPin] = useState('')
@@ -17,8 +17,8 @@ export function ChangePin() {
     setError('')
     setSuccess(false)
 
-    if (!oldPin || !newPin || !confirmPin) {
-      setError('PIN lama, PIN baru, dan konfirmasi PIN wajib diisi.')
+    if (!newPin || !confirmPin) {
+      setError('PIN baru dan konfirmasi PIN wajib diisi.')
       return
     }
     if (newPin !== confirmPin) {
@@ -33,8 +33,9 @@ export function ChangePin() {
     setLoading(true)
 
     try {
+      const token = getAdminToken()
       const { error: rpcError } = await supabase.rpc('admin_change_pin', {
-        p_old_pin: oldPin,
+        p_token: token,
         p_new_pin: newPin,
         p_recovery_pin: recoveryPin.trim() || null,
       })
@@ -44,11 +45,7 @@ export function ChangePin() {
         return
       }
 
-      // Update PIN in session storage so current session keeps working
-      sessionStorage.setItem('aptama_admin_pin', newPin)
-
       setSuccess(true)
-      setOldPin('')
       setNewPin('')
       setConfirmPin('')
       setRecoveryPin('')
@@ -81,27 +78,12 @@ export function ChangePin() {
         <div className="bg-success/10 border border-success/30 rounded-xl p-4 text-center">
           <p className="text-success text-sm font-medium">✅ PIN berhasil diganti!</p>
           <p className="text-text-muted text-xs mt-1">
-            PIN baru sudah aktif dan tersimpan di perangkat ini.
+            PIN baru sudah aktif. Login berikutnya pakai PIN baru.
           </p>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs text-text-muted mb-1 block">PIN Lama</label>
-          <input
-            type="password"
-            inputMode="numeric"
-            pattern="[0-9]*"
-            maxLength={6}
-            placeholder="PIN lama"
-            value={oldPin}
-            onChange={(e) => setOldPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
-            autoFocus
-          />
-        </div>
-
         <div>
           <label className="text-xs text-text-muted mb-1 block">PIN Baru</label>
           <input
@@ -113,6 +95,7 @@ export function ChangePin() {
             value={newPin}
             onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
             className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
+            autoFocus
           />
         </div>
 
@@ -151,7 +134,7 @@ export function ChangePin() {
 
         <button
           type="submit"
-          disabled={loading || !oldPin || !newPin || !confirmPin}
+          disabled={loading || !newPin || !confirmPin}
           className="w-full bg-primary text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
         >
           {loading ? 'Mengganti...' : '🔐 Simpan PIN Baru'}

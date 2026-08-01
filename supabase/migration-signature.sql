@@ -18,6 +18,47 @@
 -- ============================================================
 
 -- ============================================
+-- 0. SELF-CONTAINED BASELINE (idempotent)
+-- Normally setup-full.sql already creates these. Declaring them here lets
+-- this file be applied standalone to an existing production DB that may
+-- only have the pre-signature baseline (existing-DB upgrade path).
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.admin_config (
+  key text PRIMARY KEY,
+  value text NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS public.admin_pin_attempts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  ip_address text,
+  attempted_at timestamptz DEFAULT now(),
+  success boolean DEFAULT false
+);
+
+-- Defensive RLS (idempotent) so these stay locked down even when this file
+-- is applied standalone to a DB that never ran setup-full.sql.
+ALTER TABLE public.admin_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_pin_attempts ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "block_all_admin_config" ON public.admin_config;
+CREATE POLICY "block_all_admin_config" ON public.admin_config
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS "block_all_admin_pin_attempts" ON public.admin_pin_attempts;
+CREATE POLICY "block_all_admin_pin_attempts" ON public.admin_pin_attempts
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+REVOKE ALL ON public.admin_config FROM anon;
+REVOKE ALL ON public.admin_pin_attempts FROM anon;
+
+-- Default admin PIN 1234 / recovery 123456 (ON CONFLICT = don't overwrite a
+-- PIN the ketua may have already changed).
+INSERT INTO public.admin_config (key, value)
+VALUES ('pin_hash', encode(digest('1234', 'sha256'), 'hex'))
+ON CONFLICT (key) DO NOTHING;
+
+INSERT INTO public.admin_config (key, value)
+VALUES ('recovery_pin_hash', encode(digest('123456', 'sha256'), 'hex'))
+ON CONFLICT (key) DO NOTHING;
+
+-- ============================================
 -- 1. ADD NEW COLUMNS TO attendances (preserve old data)
 -- ============================================
 ALTER TABLE attendances ADD COLUMN IF NOT EXISTS check_in_at timestamptz;
@@ -83,11 +124,54 @@ CREATE POLICY "member_upload_signature"
     AND lower(storage.extension(name)) IN ('png', 'webp')
   );
 
+-- Helper used by the storage SELECT policy below: a signature path may only
+-- be signed/read if it is actually attached to an attendance row. Random
+-- UUID paths are unguessable, but this server-side check also prevents
+-- signing of any orphaned/guessed object, satisfying the review requirement
+-- to restrict sign to attendance-attached paths.
+CREATE OR REPLACE FUNCTION public._is_attached_signature(
+  p_bucket_id text,
+  p_name text
+)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT p_bucket_id = 'signatures'
+     AND p_name IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM public.attendances a
+       WHERE a.signature_path = p_name
+     );
+$$;
+GRANT EXECUTE ON FUNCTION public._is_attached_signature(text, text) TO anon, authenticated;
+
+-- Server-side orphan cleanup: as DEFINER (bypasses RLS + the missing anon
+-- DELETE policy) this removes a signature object only when NO attendance row
+-- references it. Called by the submit RPCs on their failure paths so files
+-- uploaded but never attached do not accumulate in the bucket.
+CREATE OR REPLACE FUNCTION public._cleanup_unattached_signature(p_path text)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF p_path IS NULL THEN RETURN; END IF;
+  DELETE FROM storage.objects o
+  WHERE o.bucket_id = 'signatures'
+    AND o.name = p_path
+    AND NOT EXISTS (
+      SELECT 1 FROM public.attendances a WHERE a.signature_path = o.name
+    );
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public._cleanup_unattached_signature(text) FROM PUBLIC, anon;
+
 -- Signed-URL creation (storage.object.sign) + retrieval only. The app uses
 -- only the anon key (no Supabase Auth), so "admin-only" reads are enforced
 -- via: private bucket, random unguessable filenames, and PIN/token-verified
 -- RPCs that return paths only to the Ketua UI. Direct SELECT/download/list
 -- of signature files by anon is intentionally NOT granted.
+--
+-- Review fix: the SELECT policy no longer signs ANY object in the bucket;
+-- it additionally requires _is_attached_signature(), i.e. only paths already
+-- linked to an attendances.signature_path may be signed/retrieved.
 CREATE POLICY "signed_url_access_signatures"
   ON storage.objects FOR SELECT TO anon, authenticated
   USING (
@@ -96,6 +180,7 @@ CREATE POLICY "signed_url_access_signatures"
       'storage.object.sign',
       'storage.object.get_signed'
     ])
+    AND public._is_attached_signature(bucket_id, name)
   );
 
 -- ============================================
@@ -118,7 +203,7 @@ CREATE POLICY "block_all_admin_sessions" ON admin_sessions
 -- admin_config key/value store, so admin_login works no matter which older
 -- baseline variant (setup-full / admin-pin / migration-rpc-fixes) is present.
 CREATE OR REPLACE FUNCTION public.admin_verify_pin(p_pin text)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_hash text;
 BEGIN
   SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
@@ -128,9 +213,46 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
 
+-- Rate-limit audit writes MUST survive the PIN error that follows them: a
+-- plain INSERT then RAISE EXCEPTION is rolled back (the raise aborts the
+-- current (sub)transaction), so failed attempts would never accumulate and
+-- the limiter could never trip. This helper commits its row independently via
+-- an autonomous dblink connection to the same database.
+--
+-- Connection string resolution:
+--   1. GUC app.settings.database_url (Supabase convention; set via
+--      ALTER ROLE postgres SET app.settings.database_url = 'postgresql://...')
+--   2. local fallback: unix-socket connect as the definer to the current db
+--      (used by the test harness / local dev).
+-- If neither is available the write is skipped (fail-open) rather than
+-- breaking the login flow.
+CREATE EXTENSION IF NOT EXISTS dblink;
+
+CREATE OR REPLACE FUNCTION public._record_pin_attempt(p_success boolean)
+RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_conn text := current_setting('app.settings.database_url', true);
+BEGIN
+  IF v_conn IS NULL OR v_conn = '' THEN
+    v_conn := 'dbname=' || current_database() || ' user=' || current_user;
+  END IF;
+  BEGIN
+    PERFORM dblink_exec(
+      v_conn,
+      format('INSERT INTO public.admin_pin_attempts (success, attempted_at) VALUES (%L, now())',
+             p_success::text)
+    );
+  EXCEPTION WHEN OTHERS THEN
+    NULL; -- fail-open: never block the auth flow on a failed audit write
+  END;
+END;
+$$;
+REVOKE EXECUTE ON FUNCTION public._record_pin_attempt(boolean) FROM PUBLIC, anon;
+
 CREATE OR REPLACE FUNCTION public.admin_login(p_pin text)
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_token text;
   v_expires timestamptz;
@@ -142,11 +264,11 @@ BEGIN
   END IF;
 
   IF NOT public.admin_verify_pin(p_pin) THEN
-    INSERT INTO admin_pin_attempts (success) VALUES (false);
+    PERFORM public._record_pin_attempt(false);
     RAISE EXCEPTION 'PIN salah';
   END IF;
 
-  INSERT INTO admin_pin_attempts (success) VALUES (true);
+  PERFORM public._record_pin_attempt(true);
 
   v_token := encode(gen_random_bytes(32), 'hex');
   v_expires := now() + interval '12 hours';
@@ -161,7 +283,7 @@ GRANT EXECUTE ON FUNCTION public.admin_login(text) TO anon;
 -- Validate a session token (server-verified). Slides last_seen.
 CREATE OR REPLACE FUNCTION public.admin_validate_session(p_token text)
 RETURNS boolean
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_expires timestamptz;
 BEGIN
   SELECT expires_at INTO v_expires FROM admin_sessions WHERE token = p_token;
@@ -178,7 +300,7 @@ GRANT EXECUTE ON FUNCTION public.admin_validate_session(text) TO anon;
 -- Helper used by all admin RPCs: raise unless the session is valid.
 CREATE OR REPLACE FUNCTION public.admin_require_session(p_token text)
 RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF p_token IS NULL OR NOT public.admin_validate_session(p_token) THEN
     RAISE EXCEPTION 'Sesi berakhir. Silakan masuk lagi.';
@@ -190,7 +312,7 @@ GRANT EXECUTE ON FUNCTION public.admin_require_session(text) TO anon;
 -- Logout: invalidate the token.
 CREATE OR REPLACE FUNCTION public.admin_logout(p_token text)
 RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   DELETE FROM admin_sessions WHERE token = p_token;
 END;
@@ -203,13 +325,17 @@ GRANT EXECUTE ON FUNCTION public.admin_logout(text) TO anon;
 --  the first text param changes from p_pin to p_token.)
 -- ============================================
 
+-- setup-full defined these with p_pin; the token-based variants rename the
+-- first param, so the old functions must be dropped first (CREATE OR REPLACE
+-- cannot rename input parameters). Idempotent on re-run.
+DROP FUNCTION IF EXISTS public.admin_add_member(text, text, text, text);
 CREATE OR REPLACE FUNCTION public.admin_add_member(
   p_token text,
   p_name text,
   p_group text DEFAULT null,
   p_phone text DEFAULT null
 )
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_id uuid;
 BEGIN
   PERFORM public.admin_require_session(p_token);
@@ -221,6 +347,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_add_member(text, text, text, text) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_update_member(text, uuid, text, text, text);
 CREATE OR REPLACE FUNCTION public.admin_update_member(
   p_token text,
   p_member_id uuid,
@@ -228,7 +355,7 @@ CREATE OR REPLACE FUNCTION public.admin_update_member(
   p_group text DEFAULT null,
   p_phone text DEFAULT null
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   UPDATE members
@@ -238,11 +365,12 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_update_member(text, uuid, text, text, text) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_delete_member(text, uuid);
 CREATE OR REPLACE FUNCTION public.admin_delete_member(
   p_token text,
   p_member_id uuid
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   DELETE FROM members WHERE id = p_member_id;
@@ -251,9 +379,10 @@ $$;
 GRANT EXECUTE ON FUNCTION public.admin_delete_member(text, uuid) TO anon;
 
 -- Admin-only member list (includes phone; anon members_public hides it).
+DROP FUNCTION IF EXISTS public.admin_get_members(text);
 CREATE OR REPLACE FUNCTION public.admin_get_members(p_token text)
 RETURNS TABLE (id uuid, name text, "group" text, phone text, created_at timestamptz)
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   RETURN QUERY SELECT m.id, m.name, m."group", m.phone, m.created_at
@@ -262,6 +391,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_get_members(text) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_add_event(text, text, date, time, text, timestamptz);
 CREATE OR REPLACE FUNCTION public.admin_add_event(
   p_token text,
   p_title text,
@@ -270,7 +400,7 @@ CREATE OR REPLACE FUNCTION public.admin_add_event(
   p_location text DEFAULT null,
   p_checkin_close_at timestamptz DEFAULT null
 )
-RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_id uuid;
 BEGIN
   PERFORM public.admin_require_session(p_token);
@@ -282,6 +412,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_add_event(text, text, date, time, text, timestamptz) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_update_event(text, uuid, text, date, time, text, timestamptz);
 CREATE OR REPLACE FUNCTION public.admin_update_event(
   p_token text,
   p_event_id uuid,
@@ -291,7 +422,7 @@ CREATE OR REPLACE FUNCTION public.admin_update_event(
   p_location text DEFAULT null,
   p_checkin_close_at timestamptz DEFAULT null
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   UPDATE events
@@ -302,11 +433,12 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_update_event(text, uuid, text, date, time, text, timestamptz) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_delete_event(text, uuid);
 CREATE OR REPLACE FUNCTION public.admin_delete_event(
   p_token text,
   p_event_id uuid
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   DELETE FROM events WHERE id = p_event_id;
@@ -314,13 +446,14 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_delete_event(text, uuid) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_generate_checkin_qr(text, uuid, int);
 CREATE OR REPLACE FUNCTION public.admin_generate_checkin_qr(
   p_token text,
   p_event_id uuid,
   p_minutes int DEFAULT 120
 )
 RETURNS TABLE (event_id uuid, checkin_token text, checkin_expires_at timestamptz)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_token text;
   v_expires timestamptz;
@@ -337,12 +470,13 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_generate_checkin_qr(text, uuid, int) TO anon;
 
+DROP FUNCTION IF EXISTS public.import_attendances(text, uuid, jsonb);
 CREATE OR REPLACE FUNCTION public.import_attendances(
   p_token text,
   p_event_id uuid,
   p_rows jsonb
 )
-RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS int LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_count int := 0;
   r jsonb;
@@ -382,7 +516,7 @@ CREATE OR REPLACE FUNCTION public.admin_change_pin(
   p_new_pin text,
   p_recovery_pin text DEFAULT null
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   IF p_new_pin IS NULL OR length(trim(p_new_pin)) < 4 THEN
@@ -403,18 +537,21 @@ GRANT EXECUTE ON FUNCTION public.admin_change_pin(text, text, text) TO anon;
 -- 6. QR RESOLVE (full info + error messages)
 -- ============================================
 -- Replaces the old resolve_qr_token() that only returned event_id.
+-- DROP first: the old baseline (setup-full) returns a different TABLE shape,
+-- and CREATE OR REPLACE cannot change a function's return type.
+DROP FUNCTION IF EXISTS public.resolve_qr_token(text);
 CREATE OR REPLACE FUNCTION public.resolve_qr_token(p_token text)
 RETURNS TABLE (
   event_id uuid,
   title text,
   date date,
-  time time,
+  "time" time,
   location text,
   checkin_expires_at timestamptz,
   is_valid boolean,
   error_message text
 )
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 DECLARE
   v_event record;
 BEGIN
@@ -454,12 +591,12 @@ RETURNS TABLE (
   event_id uuid,
   title text,
   date date,
-  time time,
+  "time" time,
   location text,
   checkin_token text,
   checkin_expires_at timestamptz
 )
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 BEGIN
   RETURN QUERY
     SELECT e.id, e.title, e.date, e.time, e.location,
@@ -487,7 +624,7 @@ CREATE OR REPLACE FUNCTION public.submit_attendance_with_signature(
   p_signature_path text
 )
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_event_id uuid;
   v_expires timestamptz;
@@ -504,15 +641,18 @@ BEGIN
   FROM events e WHERE e.checkin_token = p_token;
 
   IF v_event_id IS NULL THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'QR tidak valid. Silakan minta QR baru kepada pengurus.');
   END IF;
   IF v_expires IS NOT NULL AND now() > v_expires THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'QR absensi sudah kedaluwarsa. Silakan minta QR terbaru kepada pengurus.');
   END IF;
 
   -- 2. Validate member
   SELECT EXISTS(SELECT 1 FROM members WHERE id = p_member_id) INTO v_member_exists;
   IF NOT v_member_exists THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Anggota tidak ditemukan.');
   END IF;
   SELECT name INTO v_member_name FROM members WHERE id = p_member_id;
@@ -523,6 +663,7 @@ BEGIN
     WHERE event_id = v_event_id AND member_id = p_member_id AND status = 'hadir'
   ) INTO v_already;
   IF v_already THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Nama ini sudah tercatat hadir pada kegiatan tersebut.');
   END IF;
 
@@ -531,6 +672,7 @@ BEGIN
      OR NOT (p_signature_path LIKE 'checkin/%')
      OR NOT (lower(p_signature_path) LIKE '%.png' OR lower(p_signature_path) LIKE '%.webp')
      OR position('..' IN p_signature_path) > 0 THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Tanda tangan tidak valid.');
   END IF;
 
@@ -549,6 +691,7 @@ BEGIN
   FROM storage.objects
   WHERE bucket_id = 'signatures' AND name = p_signature_path;
   IF v_obj_size > 2097152 THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Ukuran tanda tangan terlalu besar. Maksimal 2 MB.');
   END IF;
 
@@ -567,6 +710,7 @@ BEGIN
     WHERE event_id = v_event_id AND member_id = p_member_id AND status = 'hadir'
   ) INTO v_already;
   IF NOT v_already THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Nama ini sudah tercatat hadir pada kegiatan tersebut.');
   END IF;
 
@@ -591,7 +735,7 @@ CREATE OR REPLACE FUNCTION public.submit_self_checkin_signature(
   p_signature_path text
 )
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_close timestamptz;
   v_title text;
@@ -604,14 +748,17 @@ BEGIN
   SELECT e.checkin_close_at, e.title INTO v_close, v_title
   FROM events e WHERE e.id = p_event_id;
   IF v_close IS NULL THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Check-in belum dibuka.');
   END IF;
   IF now() >= v_close THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Check-in sudah ditutup.');
   END IF;
 
   SELECT EXISTS(SELECT 1 FROM members WHERE id = p_member_id) INTO v_member_exists;
   IF NOT v_member_exists THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Anggota tidak ditemukan.');
   END IF;
   SELECT name INTO v_member_name FROM members WHERE id = p_member_id;
@@ -621,6 +768,7 @@ BEGIN
     WHERE event_id = p_event_id AND member_id = p_member_id AND status = 'hadir'
   ) INTO v_already;
   IF v_already THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Nama ini sudah tercatat hadir pada kegiatan tersebut.');
   END IF;
 
@@ -628,6 +776,7 @@ BEGIN
      OR NOT (p_signature_path LIKE 'checkin/%')
      OR NOT (lower(p_signature_path) LIKE '%.png' OR lower(p_signature_path) LIKE '%.webp')
      OR position('..' IN p_signature_path) > 0 THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Tanda tangan tidak valid.');
   END IF;
 
@@ -644,6 +793,7 @@ BEGIN
   FROM storage.objects
   WHERE bucket_id = 'signatures' AND name = p_signature_path;
   IF v_obj_size > 2097152 THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Ukuran tanda tangan terlalu besar. Maksimal 2 MB.');
   END IF;
 
@@ -661,6 +811,7 @@ BEGIN
     WHERE event_id = p_event_id AND member_id = p_member_id AND status = 'hadir'
   ) INTO v_already;
   IF NOT v_already THEN
+    PERFORM public._cleanup_unattached_signature(p_signature_path);
     RETURN jsonb_build_object('success', false, 'error', 'Nama ini sudah tercatat hadir pada kegiatan tersebut.');
   END IF;
 
@@ -696,7 +847,7 @@ RETURNS TABLE (
   member_name text,
   member_group text
 )
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   RETURN QUERY
@@ -719,7 +870,7 @@ CREATE OR REPLACE FUNCTION public.admin_mark_present(
   p_admin_name text DEFAULT NULL
 )
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_already boolean;
 BEGIN
   PERFORM public.admin_require_session(p_token);
@@ -761,7 +912,7 @@ CREATE OR REPLACE FUNCTION public.admin_undo_attendance(
   p_member_id uuid
 )
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_deleted int;
 BEGIN
   PERFORM public.admin_require_session(p_token);
@@ -776,6 +927,7 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_undo_attendance(text, uuid, uuid) TO anon;
 
+DROP FUNCTION IF EXISTS public.admin_upsert_attendance(text, uuid, uuid, text, text);
 CREATE OR REPLACE FUNCTION public.admin_upsert_attendance(
   p_token text,
   p_event_id uuid,
@@ -783,7 +935,7 @@ CREATE OR REPLACE FUNCTION public.admin_upsert_attendance(
   p_status text,
   p_note text DEFAULT null
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   IF p_status NOT IN ('hadir','izin','alfa') THEN
@@ -800,9 +952,10 @@ $$;
 GRANT EXECUTE ON FUNCTION public.admin_upsert_attendance(text, uuid, uuid, text, text) TO anon;
 
 -- Legacy alias kept for back-compat (now token-based).
+DROP FUNCTION IF EXISTS public.admin_get_attendance(uuid, text);
 CREATE OR REPLACE FUNCTION public.admin_get_attendance(p_event_id uuid, p_token text)
 RETURNS TABLE (id uuid, event_id uuid, member_id uuid, status text, note text)
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   RETURN QUERY
@@ -823,7 +976,7 @@ CREATE OR REPLACE FUNCTION public.get_signature_path(
   p_attendance_id uuid
 )
 RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
 DECLARE v_path text;
 BEGIN
   PERFORM public.admin_require_session(p_token);
@@ -927,3 +1080,50 @@ REVOKE EXECUTE ON FUNCTION public.resolve_qr_token(text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.get_active_checkin_qr() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.submit_attendance_with_signature(text, uuid, text) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.submit_self_checkin_signature(uuid, uuid, text) FROM PUBLIC;
+
+-- RPCs still defined in setup-full.sql (kept as-is, not re-declared here):
+-- they must NOT be callable by authenticated/service roles either, and anon
+-- keeps its explicit grant (added below) so the app continues to work.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'submit_izin') THEN
+    REVOKE EXECUTE ON FUNCTION public.submit_izin(uuid, uuid, text) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION public.submit_izin(uuid, uuid, text) TO anon;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'admin_reset_pin') THEN
+    REVOKE EXECUTE ON FUNCTION public.admin_reset_pin(text, text) FROM PUBLIC;
+    GRANT EXECUTE ON FUNCTION public.admin_reset_pin(text, text) TO anon;
+  END IF;
+END $$;
+
+-- Hardening: these two legacy SECURITY DEFINER RPCs (from setup-full.sql)
+-- never pinned search_path. Pin them now (guarded: they may be absent in
+-- a minimal baseline).
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'submit_izin') THEN
+    ALTER FUNCTION public.submit_izin(uuid, uuid, text) SET search_path = public;
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'admin_reset_pin') THEN
+    ALTER FUNCTION public.admin_reset_pin(text, text) SET search_path = public;
+  END IF;
+END $$;
+
+-- Internal helpers must not be directly callable by anon — they are only
+-- invoked from within SECURITY DEFINER admin RPCs.
+REVOKE EXECUTE ON FUNCTION public.admin_verify_pin(text) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.admin_require_session(text) FROM anon;
+
+-- ============================================
+-- 14. DROP LEGACY FACE / QR RPCs (superseded by signature check-in)
+-- Zero frontend references remain (verified against src/). Dropping
+-- the functions only; the face_* columns stay for back-compat.
+-- ============================================
+DROP FUNCTION IF EXISTS public.self_check_in(uuid, uuid, numeric, text, text);
+DROP FUNCTION IF EXISTS public.scan_qr_attendance(text, uuid);
+DROP FUNCTION IF EXISTS public.enroll_face(uuid, jsonb, text);
+DROP FUNCTION IF EXISTS public.admin_approve_face(text, uuid, boolean);
+DROP FUNCTION IF EXISTS public.get_member_descriptor(uuid);
+DROP FUNCTION IF EXISTS public.check_in_with_face(uuid, text, uuid, numeric, text, text);
+DROP FUNCTION IF EXISTS public.check_in_with_face(uuid, float8[], text, text, uuid);
+DROP FUNCTION IF EXISTS public.admin_mark_manual_attendance(text, uuid, uuid, text);

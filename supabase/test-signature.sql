@@ -48,11 +48,13 @@ BEGIN
     SELECT 1 FROM pg_constraint WHERE conname = 'attendances_attendance_source_check'
   ), 'CASE 1 FAIL: attendance_source CHECK missing';
 
+  INSERT INTO events (title, date) VALUES ('__c1_event__', CURRENT_DATE);
   BEGIN
     INSERT INTO attendances (event_id, member_id, status, attendance_source)
-    SELECT id, NULL::uuid, 'hadir', 'bogus' FROM events LIMIT 1;
+    SELECT id, NULL::uuid, 'hadir', 'bogus' FROM events WHERE title = '__c1_event__' LIMIT 1;
     RAISE EXCEPTION 'CASE 1 FAIL: CHECK did not reject bogus attendance_source';
   EXCEPTION WHEN check_violation THEN NULL; END;
+  DELETE FROM events WHERE title = '__c1_event__';
 
   RAISE NOTICE 'CASE 1 PASS: columns/constraint';
 END $$;
@@ -91,18 +93,191 @@ DO $$
 DECLARE
   v_upload boolean;
   v_select boolean;
+  v_upload_qual text;
+  v_select_qual text;
 BEGIN
   SELECT count(*) > 0 INTO v_upload
   FROM pg_policies
   WHERE schemaname='storage' AND tablename='objects' AND policyname='member_upload_signature'
-    AND cmd='INSERT' AND roles = ARRAY['anon','authenticated'];
+    AND cmd='INSERT' AND roles = ARRAY['anon','authenticated']::name[];
   SELECT count(*) > 0 INTO v_select
   FROM pg_policies
   WHERE schemaname='storage' AND tablename='objects' AND policyname='signed_url_access_signatures'
-    AND cmd='SELECT';
+    AND cmd='SELECT' AND roles = ARRAY['anon','authenticated']::name[];
   ASSERT v_upload, 'CASE 4 FAIL: member_upload_signature INSERT policy missing';
   ASSERT v_select, 'CASE 4 FAIL: signed_url_access_signatures SELECT policy missing';
+
+  -- INSERT policy must be scoped to the signatures bucket + checkin folder
+  -- (INSERT policies store their condition in with_check, not qual).
+  SELECT with_check INTO v_upload_qual FROM pg_policies
+  WHERE schemaname='storage' AND tablename='objects' AND policyname='member_upload_signature';
+  ASSERT v_upload_qual LIKE '%bucket_id = ''signatures''%'
+    AND v_upload_qual LIKE '%foldername%'
+    AND v_upload_qual LIKE '%extension%',
+    'CASE 4 FAIL: member_upload_signature not scoped to signatures/checkin: ' || v_upload_qual;
+
+  -- Review fix: SELECT policy must gate on the operation AND require the path
+  -- to be attached to an attendance row (no open signing of guessed paths).
+  SELECT qual INTO v_select_qual FROM pg_policies
+  WHERE schemaname='storage' AND tablename='objects' AND policyname='signed_url_access_signatures';
+  ASSERT v_select_qual LIKE '%allow_any_operation%'
+    AND v_select_qual LIKE '%_is_attached_signature%',
+    'CASE 4 FAIL: signed_url_access_signatures must gate on op + attachment: ' || v_select_qual;
+
+  -- No DELETE/UPDATE policy may exist on storage.objects (anon must not be
+  -- able to delete or rewrite signatures directly; orphans are cleaned by the
+  -- SECURITY DEFINER _cleanup_unattached_signature RPC instead).
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='storage' AND tablename='objects' AND cmd IN ('DELETE','UPDATE')
+  ), 'CASE 4 FAIL: unexpected DELETE/UPDATE policy on storage.objects';
+
   RAISE NOTICE 'CASE 4 PASS: storage policies';
+END $$;
+
+-- ============================================================
+-- CASE 4A: RPC grants — all app-facing RPCs EXECUTE granted to anon,
+--          revoked from PUBLIC/authenticated/service; internal helpers
+--          (admin_verify_pin, admin_require_session, _cleanup_*)
+--          NOT callable by anon.
+-- ============================================================
+DO $$
+DECLARE
+  v_rpcs text[] := ARRAY[
+    'admin_login(text)','admin_validate_session(text)','admin_logout(text)',
+    'admin_reset_pin(text,text)','admin_change_pin(text,text,text)',
+    'admin_add_member(text,text,text,text)','admin_update_member(text,uuid,text,text,text)',
+    'admin_delete_member(text,uuid)','admin_get_members(text)',
+    'admin_add_event(text,text,date,time,text,timestamptz)',
+    'admin_update_event(text,uuid,text,date,time,text,timestamptz)',
+    'admin_delete_event(text,uuid)','admin_generate_checkin_qr(text,uuid,int)',
+    'get_active_checkin_qr()','resolve_qr_token(text)',
+    'submit_attendance_with_signature(text,uuid,text)',
+    'submit_self_checkin_signature(uuid,uuid,text)','submit_izin(uuid,uuid,text)',
+    'import_attendances(text,uuid,jsonb)','admin_get_attendance_v2(uuid,text)',
+    'admin_mark_present(text,uuid,uuid,text)','admin_undo_attendance(text,uuid,uuid)',
+    'admin_upsert_attendance(text,uuid,uuid,text,text)','get_signature_path(text,uuid)'
+  ];
+  v_fn text;
+BEGIN
+  FOREACH v_fn IN ARRAY v_rpcs LOOP
+    ASSERT EXISTS (SELECT 1 FROM pg_proc WHERE oid = ('public.' || v_fn)::regprocedure),
+      'CASE 4A FAIL: RPC missing: ' || v_fn;
+    ASSERT has_function_privilege('anon', ('public.' || v_fn)::regprocedure, 'EXECUTE'),
+      'CASE 4A FAIL: anon lacks EXECUTE on ' || v_fn;
+    ASSERT NOT has_function_privilege('authenticated', ('public.' || v_fn)::regprocedure, 'EXECUTE'),
+      'CASE 4A FAIL: authenticated must NOT execute ' || v_fn;
+    ASSERT NOT has_function_privilege('service_role', ('public.' || v_fn)::regprocedure, 'EXECUTE'),
+      'CASE 4A FAIL: service_role must NOT execute ' || v_fn;
+  END LOOP;
+
+  -- Internal helpers: not directly callable by anon
+  ASSERT NOT has_function_privilege('anon', 'public.admin_verify_pin(text)', 'EXECUTE'),
+    'CASE 4A FAIL: anon must NOT execute admin_verify_pin';
+  ASSERT NOT has_function_privilege('anon', 'public.admin_require_session(text)', 'EXECUTE'),
+    'CASE 4A FAIL: anon must NOT execute admin_require_session';
+  ASSERT NOT has_function_privilege('anon', 'public._cleanup_unattached_signature(text)', 'EXECUTE'),
+    'CASE 4A FAIL: anon must NOT execute _cleanup_unattached_signature';
+  ASSERT NOT has_function_privilege('anon', 'public._record_pin_attempt(boolean)', 'EXECUTE'),
+    'CASE 4A FAIL: anon must NOT execute _record_pin_attempt';
+  -- _is_attached_signature is granted to anon/authenticated so the storage
+  -- SELECT policy (which evaluates under the querying role) can call it.
+  ASSERT has_function_privilege('anon', 'public._is_attached_signature(text,text)', 'EXECUTE'),
+    'CASE 4A FAIL: anon must execute _is_attached_signature';
+
+  RAISE NOTICE 'CASE 4A PASS: RPC grants';
+END $$;
+
+-- ============================================================
+-- CASE 4B: legacy face/QR RPCs removed (self_check_in, scan_qr_attendance,
+--          enroll_face, admin_approve_face, get_member_descriptor,
+--          check_in_with_face, admin_mark_manual_attendance)
+-- ============================================================
+DO $$
+BEGIN
+  ASSERT NOT EXISTS (
+    SELECT 1 FROM pg_proc
+    WHERE pronamespace = 'public'::regnamespace
+      AND proname IN ('self_check_in','scan_qr_attendance','enroll_face',
+                      'admin_approve_face','get_member_descriptor','check_in_with_face',
+                      'admin_mark_manual_attendance')
+  ), 'CASE 4B FAIL: legacy face/QR RPC still present';
+  RAISE NOTICE 'CASE 4B PASS: legacy RPCs dropped';
+END $$;
+
+-- ============================================================
+-- CASE 4C: storage access matrix as anon — upload to checkin/ allowed,
+--          sign/get_signed allowed ONLY for attendance-attached paths,
+--          direct SELECT denied for unattached/guessed paths, DELETE denied.
+-- ============================================================
+DO $$
+DECLARE
+  v_event uuid;
+  v_member uuid;
+  v_n int;
+  v_att uuid;
+BEGIN
+  INSERT INTO events (title, date, checkin_token, checkin_expires_at)
+  VALUES ('Matrix Event', CURRENT_DATE, 'matrixqr000001', now() + interval '1 hour')
+  RETURNING id INTO v_event;
+  INSERT INTO members (name, "group") VALUES ('Test Member Z', 'RT 9') RETURNING id INTO v_member;
+  -- Direct inserts (session user is superuser, RLS bypassed). Deliberately NOT
+  -- using _t_seed_signature: it sets session_replication_role=replica which
+  -- would disable RLS for the rest of this transaction and invalidate the
+  -- access-matrix assertions below.
+  INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+  VALUES ('signatures', 'checkin/' || v_event || '/attached.png', NULL,
+          jsonb_build_object('size', 512, 'mimetype', 'image/png'));
+  INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+  VALUES ('signatures', 'checkin/' || v_event || '/guessed.png', NULL,
+          jsonb_build_object('size', 512, 'mimetype', 'image/png'));
+  INSERT INTO attendances (event_id, member_id, status, attendance_source, signature_path, check_in_at, verified_status, verified_by)
+  SELECT v_event, v_member, 'hadir', 'member_signature', 'checkin/' || v_event || '/attached.png', now(), 'auto', 'member'
+  RETURNING id INTO v_att;
+
+  SET LOCAL ROLE anon;
+  SET LOCAL storage.operation = 'storage.object.sign';
+
+  -- sign allowed for attached path
+  SELECT count(*) INTO v_n FROM storage.objects
+  WHERE bucket_id='signatures' AND name='checkin/' || v_event || '/attached.png';
+  ASSERT v_n = 1, 'CASE 4C FAIL: anon cannot sign an attached signature';
+
+  -- sign DENIED for unattached/guessed path
+  SELECT count(*) INTO v_n FROM storage.objects
+  WHERE bucket_id='signatures' AND name='checkin/' || v_event || '/guessed.png';
+  ASSERT v_n = 0, 'CASE 4C FAIL: anon signed an unattached path';
+
+  -- direct SELECT (no sign/get_signed op) DENIED even for attached path
+  SET LOCAL storage.operation = 'storage.object.list';
+  SELECT count(*) INTO v_n FROM storage.objects
+  WHERE bucket_id='signatures' AND name='checkin/' || v_event || '/attached.png';
+  ASSERT v_n = 0, 'CASE 4C FAIL: anon directly listed a signature';
+
+  -- DELETE DENIED (no DELETE policy)
+  SET LOCAL storage.operation = 'storage.object.delete';
+  DELETE FROM storage.objects WHERE bucket_id='signatures';
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  ASSERT v_n = 0, 'CASE 4C FAIL: anon deleted signatures';
+
+  RESET ROLE;
+
+  -- anon upload to checkin/ (png) allowed
+  SET LOCAL ROLE anon;
+  SET LOCAL storage.operation = 'storage.object.insert';
+  INSERT INTO storage.objects (bucket_id, name, owner, metadata)
+  VALUES ('signatures', 'checkin/' || v_event || '/upload.png', NULL,
+          jsonb_build_object('size', 512, 'mimetype', 'image/png'));
+  GET DIAGNOSTICS v_n = ROW_COUNT;
+  ASSERT v_n = 1, 'CASE 4C FAIL: anon could not upload to checkin/';
+  RESET ROLE;
+
+  -- cleanup
+  DELETE FROM attendances WHERE id = v_att;
+  DELETE FROM events WHERE id = v_event;
+  DELETE FROM members WHERE id = v_member;
+  PERFORM _t_reset_rate_limit();
+  RAISE NOTICE 'CASE 4C PASS: storage access matrix';
 END $$;
 
 -- ============================================================
@@ -422,9 +597,7 @@ BEGIN
     END IF;
   END;
 
-  -- get_signature_path for a member_signature row
-  PERFORM _t_seed_signature('checkin/' || v_event || '/sig-f.png');
-  -- insert a signature-style row
+  -- get_signature_path for a member_signature row (sig-f.png already seeded above)
   INSERT INTO attendances (event_id, member_id, status, attendance_source, signature_path, check_in_at, verified_status, verified_by)
   SELECT v_event, v_member, 'hadir', 'member_signature', 'checkin/' || v_event || '/sig-f.png', now(), 'auto', 'member'
   ON CONFLICT (event_id, member_id) DO UPDATE
@@ -453,16 +626,17 @@ END $$;
 DO $$
 DECLARE
   v_cols text;
+  v_n int;
 BEGIN
   SELECT string_agg(column_name, ',' ORDER BY column_name) INTO v_cols
   FROM information_schema.columns
   WHERE table_schema='public' AND table_name='members_public';
   ASSERT v_cols = 'group,id,name', 'CASE 15 FAIL: members_public columns = ' || v_cols;
 
-  SELECT count(*) INTO v_cols
+  SELECT count(*) INTO v_n
   FROM information_schema.columns
   WHERE table_schema='public' AND table_name='events_public' AND column_name = 'checkin_token';
-  ASSERT v_cols = 0, 'CASE 15 FAIL: events_public must hide checkin_token';
+  ASSERT v_n = 0, 'CASE 15 FAIL: events_public must hide checkin_token';
 
   ASSERT EXISTS (
     SELECT 1 FROM pg_policies

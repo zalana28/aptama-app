@@ -9,7 +9,9 @@ export function TopBar() {
       <div className="mx-auto flex h-14 w-full max-w-md items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <img
-            src="/logos/aptama-logo.png"
+            src="/logos/aptama-logo-192.png"
+            srcSet="/logos/aptama-logo-96.png 96w, /logos/aptama-logo-128.png 128w, /logos/aptama-logo-192.png 192w, /logos/aptama-logo-256.png 256w"
+            sizes="32px"
             alt="Logo APTAMA"
             className="h-8 w-8 rounded-lg object-contain"
           />

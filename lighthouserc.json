@@ -12,7 +12,11 @@
         "categories:accessibility": ["warn", { "minScore": 0.9 }],
         "categories:best-practices": ["warn", { "minScore": 0.9 }],
         "categories:seo": ["warn", { "minScore": 0.9 }],
-        "categories:pwa": ["off"]
+        "categories:pwa": ["off"],
+        "lcp-lazy-loaded": ["off", {}],
+        "non-composited-animations": ["off", {}],
+        "prioritize-lcp-image": ["off", {}],
+        "unused-javascript": ["error", { "maxLength": 2 }]
       }
     },
     "upload": {

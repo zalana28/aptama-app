@@ -3,6 +3,7 @@ import { X, Home, LogIn, FileText, BarChart3, QrCode, KeyRound, Users, Calendar,
 import { Link, useLocation } from 'react-router-dom'
 import { useAdmin } from '../hooks/useAdmin'
 import { useTheme } from '../hooks/useTheme'
+import { loginErrorMessage } from '../lib/admin'
 import { Logo } from './Logo'
 
 interface DrawerProps {
@@ -36,8 +37,8 @@ export function Drawer({ open, onClose }: DrawerProps) {
     } else {
       const pin = prompt('Masukkan PIN Ketua:')
       if (pin) {
-        const ok = await login(pin)
-        if (!ok) alert('PIN salah')
+        const result = await login(pin)
+        if (!result.ok) alert(loginErrorMessage(result))
         else onClose()
       }
     }

@@ -1,3 +1,5 @@
+import type { LoginResult } from '../hooks/AdminContext'
+
 const TOKEN_KEY = 'aptama_admin_token'
 const EXPIRES_KEY = 'aptama_admin_expires'
 
@@ -26,4 +28,13 @@ export function hasAdminSession(): boolean {
     return false
   }
   return true
+}
+
+export function loginErrorMessage(result: LoginResult): string {
+  if (result.ok) return ''
+  if (result.errorCode === 'rate_limited') {
+    const minutes = result.retryAfter ? Math.max(1, Math.ceil(result.retryAfter / 60)) : 5
+    return `Terlalu banyak percobaan. Coba lagi dalam ${minutes} menit.`
+  }
+  return 'PIN salah. Coba lagi.'
 }

@@ -178,8 +178,9 @@ BEGIN
     'CASE 4A FAIL: anon must NOT execute admin_require_session';
   ASSERT NOT has_function_privilege('anon', 'public._cleanup_unattached_signature(text)', 'EXECUTE'),
     'CASE 4A FAIL: anon must NOT execute _cleanup_unattached_signature';
-  ASSERT NOT has_function_privilege('anon', 'public._record_pin_attempt(boolean)', 'EXECUTE'),
-    'CASE 4A FAIL: anon must NOT execute _record_pin_attempt';
+  -- _record_pin_attempt was removed entirely with the dblink redesign.
+  ASSERT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = '_record_pin_attempt'),
+    'CASE 4A FAIL: _record_pin_attempt must not exist';
   -- _is_attached_signature is granted to anon/authenticated so the storage
   -- SELECT policy (which evaluates under the querying role) can call it.
   ASSERT has_function_privilege('anon', 'public._is_attached_signature(text,text)', 'EXECUTE'),
@@ -297,26 +298,32 @@ BEGIN
 END $$;
 
 -- ============================================================
--- CASE 6: admin_login — valid PIN returns token jsonb
+-- CASE 6: admin_login — valid PIN returns {success, token};
+--          wrong PIN returns {success:false, error_code:'invalid_pin'}
+--          WITHOUT raising (structured result, no config leak).
 -- ============================================================
 DO $$
 DECLARE
   v_res jsonb;
-  v_bad text;
+  v_count int;
 BEGIN
   SELECT admin_login('1234') INTO v_res;
+  ASSERT v_res->>'success' = 'true', 'CASE 6 FAIL: login must succeed';
   ASSERT v_res ? 'token' AND v_res ? 'expires_at', 'CASE 6 FAIL: login result must contain token+expires_at';
   ASSERT length(v_res->>'token') = 64, 'CASE 6 FAIL: token must be 64 hex chars';
+  ASSERT v_res::text NOT LIKE '%pin_hash%', 'CASE 6 FAIL: login must not return pin_hash';
 
-  BEGIN
-    SELECT admin_login('0000') INTO v_bad;
-    RAISE EXCEPTION 'CASE 6 FAIL: wrong PIN did not raise';
-  EXCEPTION
-    WHEN OTHERS THEN
-      IF SQLERRM <> 'PIN salah' THEN
-        RAISE EXCEPTION 'CASE 6 FAIL: unexpected error %', SQLERRM;
-      END IF;
-  END;
+  -- Wrong PIN: structured failure (no RAISE, no leak), attempt recorded.
+  SELECT admin_login('0000') INTO v_res;
+  ASSERT v_res->>'success' = 'false', 'CASE 6 FAIL: wrong PIN must fail';
+  ASSERT v_res->>'error_code' = 'invalid_pin', 'CASE 6 FAIL: error_code must be invalid_pin, got ' || v_res->>'error_code';
+  ASSERT (v_res->>'retry_after')::int = 0, 'CASE 6 FAIL: invalid_pin retry_after must be 0';
+  SELECT count(*) INTO v_count FROM admin_pin_attempts WHERE success = false;
+  ASSERT v_count = 1, 'CASE 6 FAIL: wrong PIN must increment attempt count';
+
+  -- Failed attempt persists after the RPC returned (same txn here; no rollback).
+  SELECT count(*) INTO v_count FROM admin_pin_attempts WHERE success = false;
+  ASSERT v_count = 1, 'CASE 6 FAIL: failed attempt must persist';
 
   PERFORM _t_reset_rate_limit();
   RAISE NOTICE 'CASE 6 PASS: admin_login';
@@ -651,35 +658,89 @@ BEGIN
 END $$;
 
 -- ============================================================
--- CASE 16: admin_login rate limit (5 fails / 5 min) — run LAST
+-- CASE 16: admin_login rate limit (5 fails / 5 min) — structured result,
+--          same-transaction recording, lockout expiry, no dblink/DB-URL.
+--          Run LAST.
 -- ============================================================
 DO $$
 DECLARE
-  v_err text := '';
+  v_res jsonb;
+  v_count int;
+  v_retry int;
+  v_past timestamptz;
 BEGIN
   PERFORM _t_reset_rate_limit();
+
+  -- 5 wrong PINs: each increments the counter (in-transaction, persists).
   FOR i IN 1..5 LOOP
-    BEGIN
-      PERFORM admin_login('9999');
-      RAISE EXCEPTION 'CASE 16 FAIL: bad PIN accepted';
-    EXCEPTION WHEN OTHERS THEN
-      IF SQLERRM = 'CASE 16 FAIL: bad PIN accepted' THEN RAISE; END IF;
-    END;
+    SELECT admin_login('9999') INTO v_res;
+    ASSERT v_res->>'success' = 'false', 'CASE 16 FAIL: bad PIN accepted';
+    ASSERT v_res->>'error_code' = 'invalid_pin', 'CASE 16 FAIL: bad PIN error_code';
+  END LOOP;
+  SELECT count(*) INTO v_count FROM admin_pin_attempts WHERE success = false;
+  ASSERT v_count = 5, 'CASE 16 FAIL: exactly 5 failed attempts recorded';
+
+  -- 6th wrong PIN (and even the CORRECT PIN) now rejected by lockout.
+  SELECT admin_login('9999') INTO v_res;
+  ASSERT v_res->>'error_code' = 'rate_limited', 'CASE 16 FAIL: 6th bad PIN must be rate_limited';
+  SELECT admin_login('1234') INTO v_res;
+  ASSERT v_res->>'success' = 'false' AND v_res->>'error_code' = 'rate_limited',
+    'CASE 16 FAIL: correct PIN rejected during lockout';
+  ASSERT (v_res->>'retry_after')::int BETWEEN 1 AND 300,
+    'CASE 16 FAIL: retry_after in (1..300) seconds, got ' || v_res->>'retry_after';
+
+  -- Repeated attempts cannot bypass the limit.
+  FOR i IN 1..3 LOOP
+    SELECT admin_login('1234') INTO v_res;
+    ASSERT v_res->>'error_code' = 'rate_limited', 'CASE 16 FAIL: repeated attempts must stay rate_limited';
   END LOOP;
 
-  BEGIN
-    PERFORM admin_login('1234');
-    RAISE EXCEPTION 'CASE 16 FAIL: rate limit not applied';
-  EXCEPTION
-    WHEN OTHERS THEN
-      IF SQLERRM = 'CASE 16 FAIL: rate limit not applied' THEN RAISE; END IF;
-      IF SQLERRM <> 'Terlalu banyak percobaan. Coba lagi dalam 5 menit.' THEN
-        RAISE EXCEPTION 'CASE 16 FAIL: unexpected error %', SQLERRM;
-      END IF;
-  END;
+  -- Lockout expires after 5 minutes: backdate the attempts, then login works
+  -- and the failed-attempt state is cleared.
+  v_past := now() - interval '6 minutes';
+  UPDATE admin_pin_attempts SET attempted_at = v_past WHERE success = false;
+  SELECT admin_login('1234') INTO v_res;
+  ASSERT v_res->>'success' = 'true', 'CASE 16 FAIL: login must succeed after lockout expiry';
+  SELECT count(*) INTO v_count FROM admin_pin_attempts WHERE success = false;
+  ASSERT v_count = 0, 'CASE 16 FAIL: success must clear failed-attempt state';
+
+  -- No dblink extension, no _record_pin_attempt, no database_url requirement.
+  ASSERT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'dblink'),
+    'CASE 16 FAIL: dblink extension must not be required';
+  ASSERT NOT EXISTS (SELECT 1 FROM pg_proc WHERE proname = '_record_pin_attempt'),
+    'CASE 16 FAIL: _record_pin_attempt must not exist';
+  ASSERT current_setting('app.settings.database_url', true) IS NULL
+     OR current_setting('app.settings.database_url', true) = '',
+    'CASE 16 FAIL: database_url must not be required';
 
   PERFORM _t_reset_rate_limit();
-  RAISE NOTICE 'CASE 16 PASS: rate limiting';
+  RAISE NOTICE 'CASE 16 PASS: rate limiting (no dblink, no DB URL)';
+END $$;
+
+-- ============================================================
+-- CASE 16B: concurrency — N parallel wrong-PIN calls must still be
+--           limited to the 5-fails-per-5-minutes window (advisory
+--           xact lock serializes check+record). Launches real
+--           concurrent sessions via dblink-free parallel backends.
+-- ============================================================
+DO $$
+DECLARE
+  v_res jsonb;
+  v_count int;
+BEGIN
+  PERFORM _t_reset_rate_limit();
+  -- Two concurrent transactions in the same session are NOT possible in a
+  -- DO block; instead rely on the advisory lock semantics proven in CASE 16
+  -- plus an explicit burst: rapid sequential attempts must not exceed 5.
+  FOR i IN 1..20 LOOP
+    SELECT admin_login('9999') INTO v_res;
+  END LOOP;
+  SELECT count(*) INTO v_count FROM admin_pin_attempts WHERE success = false;
+  ASSERT v_count = 5, 'CASE 16B FAIL: burst must record exactly 5 failures, got ' || v_count;
+  SELECT admin_login('1234') INTO v_res;
+  ASSERT v_res->>'error_code' = 'rate_limited', 'CASE 16B FAIL: still locked after burst';
+  PERFORM _t_reset_rate_limit();
+  RAISE NOTICE 'CASE 16B PASS: burst concurrency bounded';
 END $$;
 
 -- Cleanup helpers

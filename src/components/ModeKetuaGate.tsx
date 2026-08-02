@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { KeyRound } from 'lucide-react'
 import { useAdmin } from '../hooks/useAdmin'
+import { loginErrorMessage } from '../lib/admin'
 
 export function ModeKetuaGate() {
   const [pinInput, setPinInput] = useState('')
@@ -20,8 +21,8 @@ export function ModeKetuaGate() {
     setLoading(true)
 
     try {
-      const ok = await login(pinInput.trim())
-      if (!ok) setError('PIN salah')
+      const result = await login(pinInput.trim())
+      if (!result.ok) setError(loginErrorMessage(result))
     } catch (err: any) {
       setError('Gagal verifikasi: ' + (err?.message || 'error'))
     } finally {

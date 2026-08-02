@@ -148,11 +148,19 @@ GRANT EXECUTE ON FUNCTION public._is_attached_signature(text, text) TO anon, aut
 -- DELETE policy) this removes a signature object only when NO attendance row
 -- references it. Called by the submit RPCs on their failure paths so files
 -- uploaded but never attached do not accumulate in the bucket.
+--
+-- Real Supabase Storage guards storage.objects with a protect_delete trigger
+-- (ERRCODE 42501) unless the caller sets storage.allow_delete_query='true' —
+-- the exact escape hatch the Storage API itself uses for deletes. We mirror
+-- that so cleanup works against a live Supabase, not just the harness. The
+-- DELETE is still tightly scoped: signatures bucket + exact path + no
+-- referencing attendance row.
 CREATE OR REPLACE FUNCTION public._cleanup_unattached_signature(p_path text)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF p_path IS NULL THEN RETURN; END IF;
+  SET LOCAL storage.allow_delete_query = 'true';
   DELETE FROM storage.objects o
   WHERE o.bucket_id = 'signatures'
     AND o.name = p_path
@@ -203,7 +211,7 @@ CREATE POLICY "block_all_admin_sessions" ON admin_sessions
 -- admin_config key/value store, so admin_login works no matter which older
 -- baseline variant (setup-full / admin-pin / migration-rpc-fixes) is present.
 CREATE OR REPLACE FUNCTION public.admin_verify_pin(p_pin text)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE v_hash text;
 BEGIN
   SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash';
@@ -213,72 +221,83 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
 
--- Rate-limit audit writes MUST survive the PIN error that follows them: a
--- plain INSERT then RAISE EXCEPTION is rolled back (the raise aborts the
--- current (sub)transaction), so failed attempts would never accumulate and
--- the limiter could never trip. This helper commits its row independently via
--- an autonomous dblink connection to the same database.
+-- Rate limiting without dblink / without a database connection-string GUC.
 --
--- Connection string resolution:
---   1. GUC app.settings.database_url (Supabase convention; set via
---      ALTER ROLE postgres SET app.settings.database_url = 'postgresql://...')
---   2. local fallback: unix-socket connect as the definer to the current db
---      (used by the test harness / local dev).
--- If neither is available the write is skipped (fail-open) rather than
--- breaking the login flow.
-CREATE EXTENSION IF NOT EXISTS dblink;
-
-CREATE OR REPLACE FUNCTION public._record_pin_attempt(p_success boolean)
-RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE
-  v_conn text := current_setting('app.settings.database_url', true);
-BEGIN
-  IF v_conn IS NULL OR v_conn = '' THEN
-    v_conn := 'dbname=' || current_database() || ' user=' || current_user;
-  END IF;
-  BEGIN
-    PERFORM dblink_exec(
-      v_conn,
-      format('INSERT INTO public.admin_pin_attempts (success, attempted_at) VALUES (%L, now())',
-             p_success::text)
-    );
-  EXCEPTION WHEN OTHERS THEN
-    NULL; -- fail-open: never block the auth flow on a failed audit write
-  END;
-END;
-$$;
-REVOKE EXECUTE ON FUNCTION public._record_pin_attempt(boolean) FROM PUBLIC, anon;
-
+-- A failed attempt is recorded in the SAME transaction as the login call: an
+-- incorrect PIN returns a structured jsonb result (error_code) instead of
+-- raising an exception, so the INSERT commits normally with the RPC and the
+-- counter accumulates reliably. Because the write is in the caller's own
+-- transaction, no autonomous/dblink connection is needed and no
+-- app.settings.database_url is required.
+--
+-- Concurrency: pg_advisory_xact_lock serializes concurrent admin_login calls
+-- for the same key, making the check + increment atomic. An attacker firing
+-- parallel requests cannot push past 5 failures per 5 minutes.
+--
+-- Leak-freedom: wrong PIN and missing admin_config both map to the same
+-- 'invalid_pin' error_code, and only the opaque session token is ever
+-- returned (never PIN hashes or admin_config contents).
 CREATE OR REPLACE FUNCTION public.admin_login(p_pin text)
 RETURNS jsonb
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE
   v_token text;
   v_expires timestamptz;
+  v_fail_count int;
+  v_retry_after int;
 BEGIN
-  -- Rate limit: max 5 failures per 5 minutes
-  IF (SELECT count(*) FROM admin_pin_attempts
-      WHERE attempted_at > now() - interval '5 minutes' AND success = false) >= 5 THEN
-    RAISE EXCEPTION 'Terlalu banyak percobaan. Coba lagi dalam 5 menit.';
+  -- Serialize concurrent attempts so the rate-limit check + record is atomic.
+  PERFORM pg_advisory_xact_lock(hashtext('aptama_admin_login'));
+
+  -- Rate limit: max 5 failures per 5 minutes (rolling window).
+  SELECT count(*) INTO v_fail_count
+  FROM admin_pin_attempts
+  WHERE attempted_at > now() - interval '5 minutes' AND success = false;
+
+  IF v_fail_count >= 5 THEN
+    SELECT GREATEST(1, ceil(extract(epoch FROM (min(attempted_at) + interval '5 minutes' - now())))::int)
+      INTO v_retry_after
+    FROM admin_pin_attempts
+    WHERE attempted_at > now() - interval '5 minutes' AND success = false;
+    RETURN jsonb_build_object(
+      'success', false,
+      'error_code', 'rate_limited',
+      'retry_after', v_retry_after
+    );
   END IF;
 
+  -- Wrong PIN or missing config: identical error_code, no existence leak.
   IF NOT public.admin_verify_pin(p_pin) THEN
-    PERFORM public._record_pin_attempt(false);
-    RAISE EXCEPTION 'PIN salah';
+    INSERT INTO admin_pin_attempts (success, attempted_at) VALUES (false, now());
+    RETURN jsonb_build_object('success', false, 'error_code', 'invalid_pin', 'retry_after', 0);
   END IF;
 
-  PERFORM public._record_pin_attempt(true);
+  -- Success: clear the failed-attempt state so a fresh 5-minute window starts.
+  DELETE FROM admin_pin_attempts WHERE success = false;
 
   v_token := encode(gen_random_bytes(32), 'hex');
   v_expires := now() + interval '12 hours';
 
   INSERT INTO admin_sessions (token, expires_at) VALUES (v_token, v_expires);
 
-  RETURN jsonb_build_object('token', v_token, 'expires_at', v_expires);
+  RETURN jsonb_build_object('success', true, 'token', v_token, 'expires_at', v_expires);
 END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_login(text) TO anon;
+
+-- Remove the dblink helper introduced only for the previous
+-- autonomous-commit rate-limit design (no longer referenced by anything).
+-- The extension itself is only dropped if nothing else depends on it, and
+-- the migration never requires it.
+DROP FUNCTION IF EXISTS public._record_pin_attempt(boolean);
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'dblink') THEN
+    DROP EXTENSION dblink;
+  END IF;
+EXCEPTION WHEN dependent_objects_still_exist THEN
+  NULL; -- other objects use dblink; leave it (this feature no longer needs it)
+END $$;
 
 -- Validate a session token (server-verified). Slides last_seen.
 CREATE OR REPLACE FUNCTION public.admin_validate_session(p_token text)
@@ -453,7 +472,7 @@ CREATE OR REPLACE FUNCTION public.admin_generate_checkin_qr(
   p_minutes int DEFAULT 120
 )
 RETURNS TABLE (event_id uuid, checkin_token text, checkin_expires_at timestamptz)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE
   v_token text;
   v_expires timestamptz;
@@ -516,7 +535,7 @@ CREATE OR REPLACE FUNCTION public.admin_change_pin(
   p_new_pin text,
   p_recovery_pin text DEFAULT null
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 BEGIN
   PERFORM public.admin_require_session(p_token);
   IF p_new_pin IS NULL OR length(trim(p_new_pin)) < 4 THEN

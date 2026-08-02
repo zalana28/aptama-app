@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { KeyRound } from 'lucide-react'
 import { useAdmin } from '../hooks/useAdmin'
+import { loginErrorMessage } from '../lib/admin'
 
 export function ModeKetuaPage() {
   const navigate = useNavigate()
@@ -22,11 +23,11 @@ export function ModeKetuaPage() {
     setLoading(true)
 
     try {
-      const ok = await login(pin)
-      if (ok) {
+      const result = await login(pin)
+      if (result.ok) {
         navigate('/admin')
       } else {
-        setError('PIN salah')
+        setError(loginErrorMessage(result))
       }
     } catch (err: any) {
       setError('Gagal verifikasi PIN: ' + (err?.message || 'error'))

@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-import { AdminContext } from './AdminContext'
+import { AdminContext, type LoginResult } from './AdminContext'
 import { setAdminSession, clearAdminSession, hasAdminSession } from '../lib/admin'
 
 export function AdminProvider({ children }: { children: ReactNode }) {
@@ -32,14 +32,22 @@ export function AdminProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  async function login(pin: string): Promise<boolean> {
-    const { data, error } = await supabase.rpc('admin_login', { p_pin: pin })
-    if (error || !data) return false
-    const session = data as { token?: string; expires_at?: string }
-    if (!session.token) return false
-    setAdminSession(session.token, session.expires_at ?? '')
+  async function login(pin: string): Promise<LoginResult> {
+    const { data } = await supabase.rpc('admin_login', { p_pin: pin })
+    const res = data as
+      | { success: true; token: string; expires_at?: string }
+      | { success: false; error_code?: string; retry_after?: number }
+      | undefined
+    if (!res?.success) {
+      if (res?.error_code === 'rate_limited') {
+        return { ok: false, errorCode: 'rate_limited', retryAfter: res.retry_after }
+      }
+      return { ok: false, errorCode: 'invalid_pin' }
+    }
+    if (!res.token) return { ok: false, errorCode: 'invalid_pin' }
+    setAdminSession(res.token, res.expires_at ?? '')
     setIsAdmin(true)
-    return true
+    return { ok: true }
   }
 
   function logout() {

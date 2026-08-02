@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAdmin } from '../hooks/useAdmin'
+import { loginErrorMessage } from '../lib/admin'
 import { supabase } from '../lib/supabase'
 import { Logo } from './Logo'
 
@@ -21,10 +22,10 @@ export function AdminLogin() {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const ok = await login(pin)
+    const result = await login(pin)
     setLoading(false)
-    if (!ok) {
-      setError('PIN salah. Coba lagi.')
+    if (!result.ok) {
+      setError(loginErrorMessage(result))
       setPin('')
     }
   }

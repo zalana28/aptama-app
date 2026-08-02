@@ -103,17 +103,6 @@ export default defineConfig({
               },
             },
           },
-          {
-            urlPattern: /\/models\/.*$/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'face-api-models',
-              expiration: {
-                maxEntries: 20,
-                maxAgeSeconds: 60 * 60 * 24 * 30,
-              },
-            },
-          },
         ],
       },
     }),
@@ -124,7 +113,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           // Code-split vendor libraries by domain to keep initial bundle light
-          if (id.includes('face-api.js')) return 'face-api'
           if (id.includes('xlsx') || id.includes('jspdf')) return 'export-vendors'
           if (id.includes('framer-motion')) return 'motion'
           if (id.includes('qrcode.react')) return 'qr'

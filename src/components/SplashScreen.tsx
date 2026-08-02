@@ -46,7 +46,9 @@ export function SplashScreen() {
           />
           <div className="relative grid h-36 w-36 place-items-center rounded-[2.25rem] border border-white/10 bg-white/[0.06] p-5 shadow-2xl backdrop-blur-xl">
             <img
-              src="/logos/aptama-logo.png"
+              src="/logos/aptama-logo-192.png"
+              srcSet="/logos/aptama-logo-96.png 96w, /logos/aptama-logo-128.png 128w, /logos/aptama-logo-192.png 192w, /logos/aptama-logo-256.png 256w"
+              sizes="144px"
               alt="Logo APTAMA"
               className="h-full w-full object-contain drop-shadow-2xl"
             />

@@ -1,36 +1,22 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
+import { useEvents } from '../hooks/useEvents'
 import { uploadSignatureBlob } from '../lib/signature'
 import { SignaturePad } from '../components/SignaturePad'
-import type { Member, QrValidation } from '../types'
+import type { Member, Event } from '../types'
 
-type Step = 'pick' | 'sign' | 'confirm' | 'submitting' | 'done'
+type Step = 'event' | 'pick' | 'sign' | 'confirm' | 'submitting' | 'done'
 
-export function ScanPage() {
-  const [searchParams] = useSearchParams()
-  const token = searchParams.get('token') ?? ''
-
-  const [step, setStep] = useState<Step>('pick')
+export function CheckInPage() {
+  const { data: events = [] } = useEvents()
+  const [step, setStep] = useState<Step>('event')
+  const [eventId, setEventId] = useState('')
   const [memberId, setMemberId] = useState('')
   const [signatureBlob, setSignatureBlob] = useState<Blob | null>(null)
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [resultMessage, setResultMessage] = useState('')
-
-  const { data: qr, isLoading: qrLoading } = useQuery({
-    queryKey: ['resolve-qr', token],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('resolve_qr_token', {
-        p_token: token,
-      })
-      if (error) throw error
-      return (Array.isArray(data) ? data[0] : data) as QrValidation
-    },
-    enabled: !!token,
-    staleTime: 30_000,
-  })
 
   const { data: members = [] } = useQuery({
     queryKey: ['members-public'],
@@ -45,6 +31,19 @@ export function ScanPage() {
     staleTime: 60_000,
   })
 
+  const openEvents = useMemo(
+    () =>
+      events.filter(
+        (ev: Event) =>
+          ev.checkin_close_at &&
+          new Date(ev.checkin_close_at).getTime() > Date.now(),
+      ),
+    [events],
+  )
+
+  const selectedEvent = events.find((ev: Event) => ev.id === eventId)
+  const selectedMember = members.find((m) => m.id === memberId)
+
   const filteredMembers = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return members
@@ -55,55 +54,22 @@ export function ScanPage() {
     )
   }, [members, search])
 
-  const selectedMember = members.find((m) => m.id === memberId)
   const previewUrl = useMemo(
     () => (signatureBlob ? URL.createObjectURL(signatureBlob) : null),
     [signatureBlob],
   )
 
-  if (!token) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
-        <div className="text-5xl">❌</div>
-        <h1 className="text-xl font-bold">QR Tidak Valid</h1>
-        <p className="text-text-muted text-sm">
-          Link QR tidak ditemukan. Minta ketua untuk generate QR baru.
-        </p>
-      </div>
-    )
-  }
-
-  if (qrLoading || !qr) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center">
-        <p className="text-text-muted text-sm">Memverifikasi QR...</p>
-      </div>
-    )
-  }
-
-  if (!qr.is_valid) {
-    return (
-      <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
-        <div className="text-5xl">⏰</div>
-        <h1 className="text-xl font-bold">QR Tidak Bisa Dipakai</h1>
-        <p className="text-text-muted text-sm">
-          {qr.error_message ?? 'QR tidak valid.'}
-        </p>
-      </div>
-    )
-  }
-
   async function handleSubmit() {
-    if (!selectedMember || !signatureBlob || !qr) return
+    if (!selectedMember || !signatureBlob) return
     setError('')
     setStep('submitting')
     let uploadedPath: string | null = null
     try {
-      uploadedPath = await uploadSignatureBlob(signatureBlob, qr.event_id)
+      uploadedPath = await uploadSignatureBlob(signatureBlob, eventId)
       const { data, error: rpcError } = await supabase.rpc(
-        'submit_attendance_with_signature',
+        'submit_self_checkin_signature',
         {
-          p_token: token,
+          p_event_id: eventId,
           p_member_id: selectedMember.id,
           p_signature_path: uploadedPath,
         },
@@ -116,15 +82,15 @@ export function ScanPage() {
       }
       if (!result.success) {
         await removeUploadedSignature(uploadedPath)
-        setError(result.error ?? 'Gagal mencatat absensi.')
+        setError(result.error ?? 'Gagal check-in.')
         setStep('confirm')
         return
       }
-      setResultMessage(result.message ?? 'Absensi berhasil!')
+      setResultMessage(result.message ?? 'Check-in berhasil!')
       setStep('done')
     } catch (err: any) {
       await removeUploadedSignature(uploadedPath)
-      setError(err?.message ?? 'Gagal mengirim absensi. Coba lagi.')
+      setError(err?.message ?? 'Gagal mengirim check-in. Coba lagi.')
       setStep('confirm')
     }
   }
@@ -138,9 +104,9 @@ export function ScanPage() {
     return (
       <div className="max-w-md mx-auto px-4 py-16 text-center space-y-4">
         <div className="text-5xl">✅</div>
-        <h1 className="text-xl font-bold text-success">Absensi Berhasil!</h1>
+        <h1 className="text-xl font-bold text-success">Check-in Berhasil!</h1>
         <p className="text-text-muted text-sm">
-          {resultMessage || `Kehadiranmu tercatat di kegiatan ${qr.title}.`}
+          {resultMessage || 'Kehadiranmu tercatat. Sampai jumpa di lokasi!'}
         </p>
         <a href="/" className="inline-block text-primary text-sm hover:underline">
           ← Kembali ke Beranda
@@ -149,43 +115,72 @@ export function ScanPage() {
     )
   }
 
-  const formatDate = (d: string) =>
-    new Date(d + 'T00:00:00').toLocaleDateString('id-ID', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-
   return (
     <div className="max-w-md mx-auto px-4 py-6 space-y-5">
-      {/* Event info + QR status */}
-      <div className="bg-bg-card border border-primary/30 rounded-xl p-4 space-y-1">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-success" />
-          <p className="text-xs font-medium text-success">QR valid</p>
-        </div>
-        <h1 className="text-lg font-bold">{qr.title}</h1>
+      <div className="text-center space-y-1">
+        <h1 className="text-xl font-bold">Check-in dari Rumah</h1>
         <p className="text-text-muted text-sm">
-          {formatDate(qr.date)}
-          {qr.time && <span> · {qr.time} WIB</span>}
-          {qr.location && <span> · {qr.location}</span>}
+          Absen sebelum kegiatan dimulai dengan tanda tangan digital.
         </p>
-        {qr.checkin_expires_at && (
-          <p className="text-[11px] text-text-muted">
-            Berlaku sampai{' '}
-            {new Date(qr.checkin_expires_at).toLocaleTimeString('id-ID', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}
-          </p>
-        )}
       </div>
+
+      {step === 'event' && (
+        <div className="space-y-3">
+          <p className="text-sm text-text-muted">Pilih kegiatan:</p>
+          {openEvents.length === 0 ? (
+            <div className="bg-bg-card border border-white/10 rounded-xl p-6 text-center">
+              <p className="text-text-muted text-sm">
+                Belum ada kegiatan dengan check-in terbuka.
+              </p>
+              <p className="text-text-muted text-xs mt-1">
+                Tunggu pengurus membuka check-in, atau scan QR saat kegiatan.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {openEvents.map((ev: Event) => (
+                <button
+                  key={ev.id}
+                  type="button"
+                  onClick={() => {
+                    setEventId(ev.id)
+                    setSignatureBlob(null)
+                    setError('')
+                    setStep('pick')
+                  }}
+                  className="w-full bg-bg-card border border-primary/30 rounded-xl p-4 text-left hover:border-primary/60 transition"
+                >
+                  <p className="font-semibold text-sm">{ev.title}</p>
+                  <p className="text-text-muted text-xs mt-0.5">
+                    {new Date(ev.date + 'T00:00:00').toLocaleDateString('id-ID', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric',
+                    })}
+                    {ev.time && <span> · {ev.time} WIB</span>}
+                  </p>
+                  {ev.checkin_close_at && (
+                    <p className="text-text-muted text-[11px] mt-1">
+                      Tutup check-in:{' '}
+                      {new Date(ev.checkin_close_at).toLocaleString('id-ID', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {step === 'pick' && (
         <div className="space-y-3">
           <p className="text-sm text-text-muted">
-            Pilih namamu, lalu tanda tangan untuk konfirmasi kehadiran.
+            Pilih namamu untuk kegiatan <span className="font-medium text-text">{selectedEvent?.title}</span>:
           </p>
           <input
             type="search"
@@ -221,6 +216,12 @@ export function ScanPage() {
               ))
             )}
           </div>
+          <button
+            onClick={() => setStep('event')}
+            className="w-full px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text transition"
+          >
+            ← Ganti kegiatan
+          </button>
         </div>
       )}
 
@@ -262,7 +263,7 @@ export function ScanPage() {
         <div className="space-y-4">
           <div className="bg-bg-card border border-white/10 rounded-xl p-4 space-y-3">
             <p className="text-xs text-text-muted uppercase tracking-wider">
-              Konfirmasi Absensi
+              Konfirmasi Check-in
             </p>
             <div className="flex items-center justify-between text-sm">
               <span className="text-text-muted">Nama</span>
@@ -270,7 +271,7 @@ export function ScanPage() {
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-text-muted">Kegiatan</span>
-              <span className="font-medium text-right">{qr.title}</span>
+              <span className="font-medium text-right">{selectedEvent?.title}</span>
             </div>
             <div>
               <p className="text-text-muted text-xs mb-1">Tanda tangan</p>
@@ -295,7 +296,7 @@ export function ScanPage() {
             disabled={step === 'submitting'}
             className="w-full bg-primary text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
           >
-            {step === 'submitting' ? 'Mengirim...' : '✅ Kirim Absensi'}
+            {step === 'submitting' ? 'Mengirim...' : '✅ Kirim Check-in'}
           </button>
           <button
             onClick={() => setStep('sign')}

@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAdmin } from '../hooks/useAdmin'
-import { Users, Calendar, FileCheck, QrCode, ShieldCheck, Settings } from 'lucide-react'
+import { Users, Calendar, FileCheck, QrCode, Settings } from 'lucide-react'
 
 export function AdminDashboardPage() {
   const { isAdmin, logout } = useAdmin()
@@ -24,7 +24,7 @@ export function AdminDashboardPage() {
         <div className="text-5xl">🛡️</div>
         <h1 className="text-xl font-bold gradient-text">Dashboard Ketua</h1>
         <p className="text-sm text-text-muted">
-          Kelola anggota, kegiatan, dan verifikasi wajah.
+          Kelola anggota, kegiatan, dan absensi.
         </p>
       </div>
 
@@ -58,23 +58,6 @@ export function AdminDashboardPage() {
               <p className="font-semibold text-sm">Kelola Kegiatan</p>
               <p className="text-xs text-text-muted mt-1">
                 Buat kegiatan baru, atur jadwal, lokasi.
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/verifikasi-wajah"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-success/50 transition"
-        >
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-success/10 text-success shrink-0">
-              <ShieldCheck size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Verifikasi Wajah</p>
-              <p className="text-xs text-text-muted mt-1">
-                Approve/tolak pendaftaran wajah anggota.
               </p>
             </div>
           </div>

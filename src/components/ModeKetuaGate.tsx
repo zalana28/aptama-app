@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { KeyRound } from 'lucide-react'
-import { supabase } from '../lib/supabase'
 import { useAdmin } from '../hooks/useAdmin'
+import { loginErrorMessage } from '../lib/admin'
 
 export function ModeKetuaGate() {
   const [pinInput, setPinInput] = useState('')
@@ -21,17 +21,8 @@ export function ModeKetuaGate() {
     setLoading(true)
 
     try {
-      const { data, error: rpcError } = await supabase.rpc('admin_verify_pin', {
-        p_pin: pinInput.trim(),
-      })
-
-      if (rpcError) throw rpcError
-
-      if (data === true) {
-        login(pinInput.trim())
-      } else {
-        setError('PIN salah')
-      }
+      const result = await login(pinInput.trim())
+      if (!result.ok) setError(loginErrorMessage(result))
     } catch (err: any) {
       setError('Gagal verifikasi: ' + (err?.message || 'error'))
     } finally {

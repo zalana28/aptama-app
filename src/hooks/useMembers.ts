@@ -1,7 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { getAdminPin } from '../lib/admin'
+import { getAdminToken } from '../lib/admin'
 import type { Member } from '../types'
+
+export interface AdminMember extends Member {
+  phone?: string
+  created_at?: string
+}
+
+export type MemberInput = { name: string; group?: string; phone?: string }
 
 export function useMembers() {
   return useQuery({
@@ -9,7 +16,7 @@ export function useMembers() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('members_public')
-        .select('id, name, group, face_status, face_enrolled_at, phone')
+        .select('id, name, group')
         .order('name')
       if (error) throw error
       return (data ?? []) as Member[]
@@ -17,12 +24,26 @@ export function useMembers() {
   })
 }
 
+// Admin-only: includes phone (goes through admin_get_members RPC + session).
+export function useAdminMembers() {
+  return useQuery({
+    queryKey: ['admin-members'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('admin_get_members', {
+        p_token: getAdminToken(),
+      })
+      if (error) throw error
+      return (data ?? []) as AdminMember[]
+    },
+  })
+}
+
 export function useAddMember() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (member: Omit<Member, 'id'>) => {
+    mutationFn: async (member: MemberInput) => {
       const { data, error } = await supabase.rpc('admin_add_member', {
-        p_pin: getAdminPin(),
+        p_token: getAdminToken(),
         p_name: member.name,
         p_group: member.group ?? null,
         p_phone: member.phone ?? null,
@@ -30,16 +51,19 @@ export function useAddMember() {
       if (error) throw error
       return { id: data as string, ...member } as Member
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['members'] })
+      qc.invalidateQueries({ queryKey: ['admin-members'] })
+    },
   })
 }
 
 export function useUpdateMember() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Member> & { id: string }) => {
+    mutationFn: async ({ id, ...updates }: MemberInput & { id: string }) => {
       const { error } = await supabase.rpc('admin_update_member', {
-        p_pin: getAdminPin(),
+        p_token: getAdminToken(),
         p_member_id: id,
         p_name: updates.name ?? null,
         p_group: updates.group ?? null,
@@ -47,7 +71,10 @@ export function useUpdateMember() {
       })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['members'] })
+      qc.invalidateQueries({ queryKey: ['admin-members'] })
+    },
   })
 }
 
@@ -56,11 +83,14 @@ export function useDeleteMember() {
   return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc('admin_delete_member', {
-        p_pin: getAdminPin(),
+        p_token: getAdminToken(),
         p_member_id: id,
       })
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['members'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['members'] })
+      qc.invalidateQueries({ queryKey: ['admin-members'] })
+    },
   })
 }

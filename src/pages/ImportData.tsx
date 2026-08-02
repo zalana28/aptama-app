@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { useEvents } from '../hooks/useEvents'
 import { useMembers } from '../hooks/useMembers'
 import { useAdmin } from '../hooks/useAdmin'
+import { getAdminToken } from '../lib/admin'
 import { supabase } from '../lib/supabase'
-import { getAdminPin } from '../lib/admin'
 
 interface ImportRow {
   name: string
@@ -67,8 +67,8 @@ export function ImportData() {
 
   async function handleImport() {
     if (!eventId || rows.length === 0) return
-    let pin: string
-    try { pin = getAdminPin() } catch { setError('PIN admin tidak ditemukan.'); setLoading(false); return }
+    let token: string
+    try { token = getAdminToken() } catch { setError('Sesi admin berakhir. Login ulang.'); return }
 
     setLoading(true)
     setError('')
@@ -81,7 +81,7 @@ export function ImportData() {
     }))
 
     const { data, error: rpcError } = await supabase.rpc('import_attendances', {
-      p_pin: pin,
+      p_token: token,
       p_event_id: eventId,
       p_rows: payload,
     })

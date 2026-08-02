@@ -1,34 +1,32 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { QrCode, Scan } from 'lucide-react'
+import { Scan, PenLine } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
-import type { Event } from '../types'
 
-function isQrActive(event: Event) {
-  const expiresAt = event.checkin_expires_at
-  if (!event.checkin_token || !expiresAt) return false
-  return new Date(expiresAt).getTime() > Date.now()
+interface ActiveQr {
+  event_id: string
+  title: string
+  date: string
+  time?: string
+  location?: string
+  checkin_token: string
+  checkin_expires_at: string
 }
 
 export function ScanQrPage() {
-  const { data: events = [], isLoading } = useQuery({
+  const { data: activeQrEvent, isLoading } = useQuery({
     queryKey: ['active-qr-events'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('events')
-        .select('id, title, date, checkin_token, checkin_expires_at')
-        .order('date', { ascending: false })
+      const { data, error } = await supabase.rpc('get_active_checkin_qr')
       if (error) throw error
-      return (data ?? []) as Event[]
+      const row = Array.isArray(data) ? data[0] : data
+      return (row ?? null) as ActiveQr | null
     },
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   })
-
-  const activeQrEvents = events.filter(isQrActive)
-  const activeQrEvent = activeQrEvents[0] ?? null
 
   return (
     <div className="space-y-6 py-6">
@@ -36,7 +34,7 @@ export function ScanQrPage() {
         <div className="text-5xl">📱</div>
         <h1 className="text-xl font-bold">Scan QR</h1>
         <p className="text-sm text-text-muted">
-          Scan QR dari ketua, lalu verifikasi wajah untuk absen hadir.
+          Scan QR dari ketua, lalu tanda tangan untuk absen hadir.
         </p>
       </div>
 
@@ -56,7 +54,7 @@ export function ScanQrPage() {
           </div>
           <p className="mt-3 text-xs text-zinc-500">
             Berlaku sampai:{' '}
-            {new Date(activeQrEvent.checkin_expires_at!).toLocaleString('id-ID')}
+            {new Date(activeQrEvent.checkin_expires_at).toLocaleString('id-ID')}
           </p>
         </div>
       ) : (
@@ -79,7 +77,7 @@ export function ScanQrPage() {
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">Scan QR Kegiatan</p>
               <p className="text-xs text-text-muted mt-1">
-                Buka link QR atau scan dengan kamera.
+                Buka link QR lalu tanda tangan untuk absen.
               </p>
             </div>
           </div>
@@ -91,12 +89,12 @@ export function ScanQrPage() {
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
-              <QrCode size={20} />
+              <PenLine size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Check-in Verifikasi Wajah</p>
+              <p className="font-semibold text-sm">Check-in dari Rumah</p>
               <p className="text-xs text-text-muted mt-1">
-                Absen dari rumah sebelum jam mulai (harus sudah daftar wajah).
+                Absen sebelum jam mulai dengan tanda tangan digital.
               </p>
             </div>
           </div>
@@ -107,8 +105,8 @@ export function ScanQrPage() {
         <h2 className="font-semibold text-sm mb-3">ℹ️ Catatan</h2>
         <ul className="space-y-2 text-xs text-text-muted">
           <li>• QR aktif hanya saat kegiatan berlangsung</li>
-          <li>• Wajahmu harus sudah diapprove ketua</li>
-          <li>• Selfie saat absen akan dicocokan dengan wajah terdaftar</li>
+          <li>• Pilih namamu lalu tanda tangan sebagai bukti kehadiran</li>
+          <li>• Tanda tangan tersimpan dan bisa dicek ketua</li>
           <li>• Check-in dari rumah hanya bisa sebelum jam mulai kegiatan</li>
         </ul>
       </div>

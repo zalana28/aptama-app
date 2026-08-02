@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
   QrCode,
-  ShieldCheck,
   Users,
   Calendar,
   ClipboardCheck,
@@ -18,12 +17,6 @@ const adminMenus = [
     desc: 'Generate QR untuk kegiatan.',
     icon: QrCode,
     to: '/generate-qr',
-  },
-  {
-    title: 'Verifikasi Wajah',
-    desc: 'Approve wajah anggota pending.',
-    icon: ShieldCheck,
-    to: '/verifikasi-wajah',
   },
   {
     title: 'Kelola Anggota',
@@ -76,7 +69,7 @@ export function PengurusDashboard() {
     <div className="space-y-6 py-6">
       <div className="text-center space-y-2">
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#1B7A3D]/15 text-[#1B7A3D]">
-          <ShieldCheck size={32} />
+          <KeyRound size={32} />
         </div>
         <h1 className="text-2xl font-bold">Pengurus</h1>
         <p className="text-sm text-text-muted">

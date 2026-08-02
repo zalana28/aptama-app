@@ -174,8 +174,8 @@ BEGIN
     RAISE EXCEPTION 'Terlalu banyak percobaan. Coba lagi dalam 5 menit.';
   END IF;
 
-  -- Get stored hash
-  SELECT pin_hash INTO v_hash FROM admin_pin_config LIMIT 1;
+  -- Get stored hash from the admin_config key/value store
+  SELECT value INTO v_hash FROM admin_config WHERE key = 'pin_hash' LIMIT 1;
 
   IF v_hash IS NULL THEN
     -- First-time setup: accept default and store hash

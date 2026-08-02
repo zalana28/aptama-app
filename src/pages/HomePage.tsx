@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Camera, FileText, Calendar } from 'lucide-react'
+import { QrCode, FileText, Calendar, PenLine } from 'lucide-react'
 
 export function HomePage() {
   return (
@@ -15,17 +15,34 @@ export function HomePage() {
 
       <div className="space-y-3">
         <Link
-          to="/daftar-wajah"
+          to="/scan-qr"
           className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-primary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <Camera size={20} />
+              <QrCode size={20} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Daftar Face ID</p>
+              <p className="font-semibold text-sm">Scan QR Absen</p>
               <p className="text-xs text-text-muted mt-1">
-                Daftarkan wajah sekali supaya absen tinggal scan.
+                Buka link QR dari ketua lalu tanda tangan untuk hadir.
+              </p>
+            </div>
+          </div>
+        </Link>
+
+        <Link
+          to="/checkin"
+          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+        >
+          <div className="flex items-start gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
+              <PenLine size={20} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-sm">Check-in dari Rumah</p>
+              <p className="text-xs text-text-muted mt-1">
+                Absen sebelum jam mulai pakai tanda tangan digital.
               </p>
             </div>
           </div>
@@ -69,10 +86,10 @@ export function HomePage() {
       <div className="bg-bg-card border border-white/10 rounded-xl p-4">
         <h2 className="font-semibold text-sm mb-3">📢 Cara Absen</h2>
         <ol className="space-y-2 text-xs text-text-muted">
-          <li>1. Daftar wajah sekali (halaman Daftar Face ID)</li>
-          <li>2. Tunggu ketua approve wajahmu</li>
-          <li>3. Saat kegiatan, scan QR dari ketua</li>
-          <li>4. Selfie wajah → otomatis hadir kalau cocok</li>
+          <li>1. Saat kegiatan, scan QR yang ditampilkan ketua</li>
+          <li>2. Pilih namamu di daftar</li>
+          <li>3. Tanda tangan digital sebagai bukti kehadiran</li>
+          <li>4. Kehadiranmu langsung tercatat</li>
         </ol>
       </div>
     </div>

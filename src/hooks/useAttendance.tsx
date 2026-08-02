@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../lib/supabase'
-import { getAdminPin } from '../lib/admin'
+import { getAdminToken } from '../lib/admin'
 import { useAdmin } from './useAdmin'
-import type { Attendance, AttendanceStatus } from '../types'
+import type { Attendance, AttendanceStatus, AdminAttendanceRow } from '../types'
 
 export function useAttendanceByEvent(eventId: string) {
   return useQuery({
@@ -20,24 +20,28 @@ export function useAttendanceByEvent(eventId: string) {
 }
 
 /**
- * Ketua-only: ambil attendance dengan kolom `note` (alasan izin).
- * Memanggil RPC `admin_get_attendance` yang verify PIN server-side.
- * Hanya enabled jika user adalah admin DAN PIN ada di sessionStorage.
+ * Ketua-only: full attendance rows (note, signature_path, check_in_at,
+ * verified_by, member_name) via admin_get_attendance_v2 (session token).
  */
 export function useAdminAttendanceByEvent(eventId: string) {
   const { isAdmin } = useAdmin()
   return useQuery({
     queryKey: ['admin_attendance', eventId, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_get_attendance', {
+      const { data, error } = await supabase.rpc('admin_get_attendance_v2', {
         p_event_id: eventId,
-        p_pin: getAdminPin(),
+        p_token: getAdminToken(),
       })
       if (error) throw error
-      return (data ?? []) as Attendance[]
+      return (data ?? []) as AdminAttendanceRow[]
     },
     enabled: !!eventId && isAdmin,
   })
+}
+
+function invalidateAttendance(qc: ReturnType<typeof useQueryClient>, eventId: string) {
+  qc.invalidateQueries({ queryKey: ['attendance', eventId] })
+  qc.invalidateQueries({ queryKey: ['admin_attendance', eventId] })
 }
 
 export function useUpsertAttendance() {
@@ -55,7 +59,7 @@ export function useUpsertAttendance() {
       note?: string
     }) => {
       const { error } = await supabase.rpc('admin_upsert_attendance', {
-        p_pin: getAdminPin(),
+        p_token: getAdminToken(),
         p_event_id: event_id,
         p_member_id: member_id,
         p_status: status,
@@ -63,10 +67,54 @@ export function useUpsertAttendance() {
       })
       if (error) throw error
     },
-    onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['attendance', vars.event_id] })
-      qc.invalidateQueries({ queryKey: ['admin_attendance', vars.event_id] })
+    onSuccess: (_data, vars) => invalidateAttendance(qc, vars.event_id),
+  })
+}
+
+export function useMarkPresent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      event_id,
+      member_id,
+      admin_name,
+    }: {
+      event_id: string
+      member_id: string
+      admin_name?: string
+    }) => {
+      const { data, error } = await supabase.rpc('admin_mark_present', {
+        p_token: getAdminToken(),
+        p_event_id: event_id,
+        p_member_id: member_id,
+        p_admin_name: admin_name ?? null,
+      })
+      if (error) throw error
+      return data as { success?: boolean; error?: string }
     },
+    onSuccess: (_data, vars) => invalidateAttendance(qc, vars.event_id),
+  })
+}
+
+export function useUndoAttendance() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      event_id,
+      member_id,
+    }: {
+      event_id: string
+      member_id: string
+    }) => {
+      const { data, error } = await supabase.rpc('admin_undo_attendance', {
+        p_token: getAdminToken(),
+        p_event_id: event_id,
+        p_member_id: member_id,
+      })
+      if (error) throw error
+      return data as { success?: boolean; error?: string }
+    },
+    onSuccess: (_data, vars) => invalidateAttendance(qc, vars.event_id),
   })
 }
 

@@ -8,7 +8,7 @@ type FormData = { title: string; date: string; time: string; location: string }
 const emptyForm: FormData = { title: '', date: '', time: '', location: '' }
 
 function sisaHari(tanggal: string): number {
-  const ms = new Date(tanggal).getTime() - Date.now()
+  const ms = new Date(tanggal + 'T00:00:00').getTime() - Date.now()
   return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }
 

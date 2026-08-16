@@ -122,9 +122,9 @@ export function ScanPage() {
       }
       setResultMessage(result.message ?? 'Absensi berhasil!')
       setStep('done')
-    } catch (err: any) {
+    } catch (err: unknown) {
       await removeUploadedSignature(uploadedPath)
-      setError(err?.message ?? 'Gagal mengirim absensi. Coba lagi.')
+      setError(err instanceof Error ? err.message : 'Gagal mengirim absensi. Coba lagi.')
       setStep('confirm')
     }
   }

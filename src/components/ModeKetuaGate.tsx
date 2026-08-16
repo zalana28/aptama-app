@@ -23,8 +23,8 @@ export function ModeKetuaGate() {
     try {
       const result = await login(pinInput.trim())
       if (!result.ok) setError(loginErrorMessage(result))
-    } catch (err: any) {
-      setError('Gagal verifikasi: ' + (err?.message || 'error'))
+    } catch (err: unknown) {
+      setError('Gagal verifikasi: ' + (err instanceof Error ? err.message : 'error'))
     } finally {
       setLoading(false)
     }

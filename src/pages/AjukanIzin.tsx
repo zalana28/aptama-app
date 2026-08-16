@@ -1,23 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Member, Event } from '../types'
+import { useEvents } from '../hooks/useEvents'
+import { useMembers } from '../hooks/useMembers'
 
 export function AjukanIzin() {
-  const [members, setMembers] = useState<Member[]>([])
-  const [events, setEvents] = useState<Event[]>([])
+  const { data: members = [] } = useMembers()
+  const { data: events = [] } = useEvents()
   const [memberId, setMemberId] = useState('')
   const [eventId, setEventId] = useState('')
   const [reason, setReason] = useState('')
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    supabase.from('members_public').select('id, name, group').order('name')
-      .then(({ data }) => setMembers((data ?? []) as Member[]))
-    supabase.from('events_public').select('id, title, date, time, location, checkin_close_at, created_at').order('date', { ascending: false })
-      .then(({ data }) => setEvents((data ?? []) as Event[]))
-  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

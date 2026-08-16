@@ -41,6 +41,8 @@ export function useUpdateEvent() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Event> & { id: string }) => {
+      // Note: undefined fields are sent as null to clear them.
+      // Callers must include all fields they want to keep.
       const { error } = await supabase.rpc('admin_update_event', {
         p_token: getAdminToken(),
         p_event_id: id,

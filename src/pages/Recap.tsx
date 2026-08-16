@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
@@ -104,31 +104,38 @@ export function Recap() {
   const { data: adminRows } = useAdminAttendanceByEvent(selectedEvent)
   const attendanceRows = isAdmin ? adminRows : publicRows
 
-  const selectedEv = events?.find((e) => e.id === selectedEvent)
+  const selectedEv = useMemo(() => events?.find((e) => e.id === selectedEvent), [events, selectedEvent])
 
-  // Map member_id -> status & note
-  const statusMap = new Map<string, AttendanceStatus>()
-  const noteMap = new Map<string, string>()
-  attendanceRows?.forEach((r: Attendance) => {
-    statusMap.set(r.member_id, r.status as AttendanceStatus)
-    if (r.note) noteMap.set(r.member_id, r.note)
-  })
+  const { statusMap, hadir, izin, alfa, total, hadirEntries, izinEntries, alfaEntries } = useMemo(() => {
+    const sm = new Map<string, AttendanceStatus>()
+    const nm = new Map<string, string>()
+    attendanceRows?.forEach((r: Attendance) => {
+      sm.set(r.member_id, r.status as AttendanceStatus)
+      if (r.note) nm.set(r.member_id, r.note)
+    })
 
-  const hadir = (members ?? []).filter((m) => statusMap.get(m.id) === 'hadir')
-  const izin: IzinEntry[] = (members ?? [])
-    .filter((m) => statusMap.get(m.id) === 'izin')
-    .map((m) => ({ member: m, note: noteMap.get(m.id) }))
-  const alfa = (members ?? []).filter((m) => !statusMap.has(m.id))
-  const total = members?.length ?? 0
+    const h = (members ?? []).filter((m) => sm.get(m.id) === 'hadir')
+    const i: IzinEntry[] = (members ?? [])
+      .filter((m) => sm.get(m.id) === 'izin')
+      .map((m) => ({ member: m, note: nm.get(m.id) }))
+    const a = (members ?? []).filter((m) => !sm.has(m.id))
+    const tot = members?.length ?? 0
 
-  const hadirEntries: StatusEntry[] = hadir.map((m) => ({ id: m.id, name: m.name, group: m.group }))
-  const izinEntries: StatusEntry[] = izin.map((x) => ({
-    id: x.member.id,
-    name: x.member.name,
-    group: x.member.group,
-    note: x.note,
-  }))
-  const alfaEntries: StatusEntry[] = alfa.map((m) => ({ id: m.id, name: m.name, group: m.group }))
+    const hE: StatusEntry[] = h.map((m) => ({ id: m.id, name: m.name, group: m.group }))
+    const iE: StatusEntry[] = i.map((x) => ({
+      id: x.member.id,
+      name: x.member.name,
+      group: x.member.group,
+      note: x.note,
+    }))
+    const aE: StatusEntry[] = a.map((m) => ({ id: m.id, name: m.name, group: m.group }))
+
+    return {
+      statusMap: sm, noteMap: nm,
+      hadir: h, izin: i, alfa: a, total: tot,
+      hadirEntries: hE, izinEntries: iE, alfaEntries: aE
+    }
+  }, [attendanceRows, members])
 
   function handleShare() {
     if (!selectedEv) return

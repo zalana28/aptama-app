@@ -1,8 +1,8 @@
 import { Moon, Sun } from 'lucide-react'
-import { useTheme } from '../theme/useTheme'
+import { useTheme } from '../hooks/useTheme'
 
 export function TopBar() {
-  const { theme, toggleTheme } = useTheme()
+  const { resolvedTheme, toggleTheme } = useTheme()
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-white/10 bg-[#0B0F0D]/80 backdrop-blur-xl">
@@ -26,7 +26,7 @@ export function TopBar() {
           onClick={toggleTheme}
           className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-zinc-200 hover:bg-white/10 transition"
         >
-          {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+          {resolvedTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
         </button>
       </div>
     </header>

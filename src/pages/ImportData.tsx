@@ -93,6 +93,8 @@ export function ImportData() {
     }
 
     setImportedCount(data ?? 0)
+    setRows([])
+    setRaw('')
   }
 
   if (!isAdmin) {

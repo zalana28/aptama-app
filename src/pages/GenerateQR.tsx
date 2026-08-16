@@ -28,8 +28,8 @@ export function GenerateQR() {
     let token: string
     try {
       token = getAdminToken()
-    } catch (err: any) {
-      setError(err?.message || 'Sesi admin berakhir. Login ulang.')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Sesi admin berakhir. Login ulang.')
       setLoading(false)
       return
     }

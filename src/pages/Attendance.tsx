@@ -160,8 +160,8 @@ export function Attendance() {
         return
       }
       setConfirmTarget(null)
-    } catch (err: any) {
-      setConfirmError(err?.message ?? 'Gagal menyimpan. Coba lagi.')
+    } catch (err: unknown) {
+      setConfirmError(err instanceof Error ? err.message : 'Gagal menyimpan. Coba lagi.')
     } finally {
       setConfirmLoading(false)
     }
@@ -176,8 +176,8 @@ export function Attendance() {
       const url = await getSignatureViewUrl(row.id)
       if (!url) throw new Error('Tanda tangan tidak ditemukan.')
       setSigUrl(url)
-    } catch (err: any) {
-      setSigError(err?.message ?? 'Gagal memuat tanda tangan.')
+    } catch (err: unknown) {
+      setSigError(err instanceof Error ? err.message : 'Gagal memuat tanda tangan.')
     } finally {
       setSigLoading(false)
     }

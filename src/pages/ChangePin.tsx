@@ -49,8 +49,8 @@ export function ChangePin() {
       setNewPin('')
       setConfirmPin('')
       setRecoveryPin('')
-    } catch (err: any) {
-      setError('Gagal mengganti PIN: ' + (err?.message ?? 'error tidak diketahui'))
+    } catch (err: unknown) {
+      setError('Gagal mengganti PIN: ' + (err instanceof Error ? err.message : 'error tidak diketahui'))
     } finally {
       setLoading(false)
     }

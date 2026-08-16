@@ -88,9 +88,9 @@ export function CheckInPage() {
       }
       setResultMessage(result.message ?? 'Check-in berhasil!')
       setStep('done')
-    } catch (err: any) {
+    } catch (err: unknown) {
       await removeUploadedSignature(uploadedPath)
-      setError(err?.message ?? 'Gagal mengirim check-in. Coba lagi.')
+      setError(err instanceof Error ? err.message : 'Gagal mengirim check-in. Coba lagi.')
       setStep('confirm')
     }
   }

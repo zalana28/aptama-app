@@ -29,8 +29,8 @@ export function ModeKetuaPage() {
       } else {
         setError(loginErrorMessage(result))
       }
-    } catch (err: any) {
-      setError('Gagal verifikasi PIN: ' + (err?.message || 'error'))
+    } catch (err: unknown) {
+      setError('Gagal verifikasi PIN: ' + (err instanceof Error ? err.message : 'error'))
     } finally {
       setLoading(false)
     }

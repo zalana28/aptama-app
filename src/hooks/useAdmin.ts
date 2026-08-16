@@ -2,5 +2,7 @@ import { useContext } from 'react'
 import { AdminContext } from './AdminContext'
 
 export function useAdmin() {
-  return useContext(AdminContext)
+  const ctx = useContext(AdminContext)
+  if (!ctx) throw new Error('useAdmin must be used inside AdminProvider')
+  return ctx
 }

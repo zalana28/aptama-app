@@ -104,7 +104,7 @@ function MainApp() {
               <Route path="rekap" element={<RekapPage />} />
               <Route path="pengurus" element={<PengurusPage />} />
               <Route path="anggota" element={<AdminGate><Members /></AdminGate>} />
-              <Route path="kegiatan" element={<AdminGate><Events /></AdminGate>} />
+              <Route path="kegiatan" element={<Events />} />
               <Route path="absensi" element={<AdminGate><Attendance /></AdminGate>} />
               <Route path="generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
               <Route path="izin" element={<AjukanIzin />} />

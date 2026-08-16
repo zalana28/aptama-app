@@ -58,7 +58,7 @@ export function ModeKetuaPage() {
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="Masukkan PIN"
-              className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-sm text-text focus:outline-none focus:border-primary"
+              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary shadow-sm"
               required
             />
           </div>

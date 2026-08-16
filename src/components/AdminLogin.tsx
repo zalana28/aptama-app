@@ -86,7 +86,7 @@ export function AdminLogin() {
             placeholder="Masukkan PIN"
             value={pin}
             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+            className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
             autoFocus
           />
           {error && <p className="text-danger text-sm">{error}</p>}
@@ -121,7 +121,7 @@ export function AdminLogin() {
             placeholder="Recovery PIN"
             value={recoveryPin}
             onChange={(e) => setRecoveryPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+            className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
             autoFocus
           />
           <input
@@ -132,7 +132,7 @@ export function AdminLogin() {
             placeholder="PIN baru"
             value={newPin}
             onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+            className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
           />
           <input
             type="password"
@@ -142,7 +142,7 @@ export function AdminLogin() {
             placeholder="Ulangi PIN baru"
             value={confirmNewPin}
             onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
+            className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.5em] text-text focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition"
           />
           {error && <p className="text-danger text-sm">{error}</p>}
           <button

@@ -118,7 +118,7 @@ export function ImportData() {
         <select
           value={eventId}
           onChange={(e) => setEventId(e.target.value)}
-          className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+          className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
         >
           <option value="">— Pilih kegiatan —</option>
           {events?.map((ev) => (
@@ -144,7 +144,7 @@ export function ImportData() {
           onChange={(e) => setRaw(e.target.value)}
           placeholder="Budi, hadir&#10;Siti, izin, sakit&#10;Andi, alfa"
           rows={8}
-          className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+          className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
         />
       </div>
 
@@ -157,8 +157,8 @@ export function ImportData() {
       </button>
 
       {rows.length > 0 && (
-        <div className="bg-bg-card rounded-xl border border-white/10 overflow-hidden">
-          <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+        <div className="bg-bg-card rounded-xl border border-border overflow-hidden">
+          <div className="px-4 py-2 border-b border-border flex items-center justify-between">
             <span className="text-sm font-medium">Preview ({rows.length} baris)</span>
             <span className="text-xs text-text-muted">
               {rows.filter((r) => r.found).length} nama cocok

@@ -200,7 +200,7 @@ export function Attendance() {
       <select
         value={selectedEvent}
         onChange={(e) => setSelectedEvent(e.target.value)}
-        className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+        className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
       >
         <option value="">— Pilih kegiatan —</option>
         {events?.map((ev) => (
@@ -233,7 +233,7 @@ export function Attendance() {
           placeholder="Cari nama atau RT/RW..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+          className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
         />
       )}
 
@@ -254,7 +254,7 @@ export function Attendance() {
                 <div
                   key={m.id}
                   className={`bg-bg-card rounded-xl px-4 py-3 border transition ${
-                    current ? statusConfig[current].bg : 'border-white/10'
+                    current ? statusConfig[current].bg : 'border-border'
                   } ${liveIds.has(m.id) ? 'ring-2 ring-primary animate-pulse-dot' : ''}`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -314,7 +314,7 @@ export function Attendance() {
                           className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition ${
                             current === s
                               ? statusConfig[s].bg + ' ' + statusConfig[s].color
-                              : 'border-white/10 text-text-muted hover:border-white/20'
+                              : 'border-border text-text-muted hover:border-white/20'
                           }`}
                         >
                           {statusConfig[s].label}
@@ -335,7 +335,7 @@ export function Attendance() {
       {/* Confirm toggle dialog */}
       {confirmTarget && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-white/10">
+          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-border">
             <h3 className="font-medium text-sm">
               {confirmTarget.action === 'present'
                 ? `Tandai hadir — ${confirmTarget.name}`
@@ -381,14 +381,14 @@ export function Attendance() {
       {/* Note modal */}
       {noteModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-white/10">
+          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-border">
             <h3 className="font-medium text-sm">📝 Alasan Izin — {noteModal.memberName}</h3>
             <textarea
               value={noteText}
               onChange={(e) => setNoteText(e.target.value)}
               placeholder="Tulis alasan izin (opsional)..."
               rows={3}
-              className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
               autoFocus
             />
             <p className="text-xs text-text-muted">Alasan ini hanya bisa dilihat oleh ketua.</p>
@@ -413,7 +413,7 @@ export function Attendance() {
       {/* Signature viewer modal */}
       {sigViewer && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
-          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-white/10">
+          <div className="bg-bg-card rounded-xl p-4 w-full max-w-sm space-y-3 border border-border">
             <h3 className="font-medium text-sm">✍️ Tanda tangan — {sigViewer.memberName}</h3>
             {sigLoading ? (
               <p className="text-text-muted text-sm text-center py-8">Memuat...</p>

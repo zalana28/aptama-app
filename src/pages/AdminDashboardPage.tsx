@@ -31,7 +31,7 @@ export function AdminDashboardPage() {
       <div className="space-y-3">
         <Link
           to="/anggota"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-primary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
@@ -48,7 +48,7 @@ export function AdminDashboardPage() {
 
         <Link
           to="/kegiatan"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
@@ -65,7 +65,7 @@ export function AdminDashboardPage() {
 
         <Link
           to="/generate-qr"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-warning/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-warning/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-warning/10 text-warning shrink-0">
@@ -82,7 +82,7 @@ export function AdminDashboardPage() {
 
         <Link
           to="/absensi"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-info/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-info/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-info/10 text-info shrink-0">
@@ -99,7 +99,7 @@ export function AdminDashboardPage() {
 
         <Link
           to="/ganti-pin"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-danger/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-danger/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-danger/10 text-danger shrink-0">

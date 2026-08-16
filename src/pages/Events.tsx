@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useEvents, useAddEvent, useUpdateEvent, useDeleteEvent } from '../hooks/useEvents'
+import { useAdmin } from '../hooks/useAdmin'
 import { errorMessage } from '../lib/errors'
 import type { Event } from '../types'
 
@@ -22,6 +23,7 @@ function formatDate(d: string): string {
 }
 
 export function Events() {
+  const { isAdmin } = useAdmin()
   const { data: events, isLoading } = useEvents()
   const addEvent = useAddEvent()
   const updateEvent = useUpdateEvent()
@@ -98,21 +100,24 @@ export function Events() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">📅 Kegiatan</h1>
-        {!showForm && (
+        <div>
+          <h1 className="text-xl font-bold">📅 Kegiatan</h1>
+          <p className="text-xs text-text-muted mt-0.5">Jadwal kegiatan kepemudaan APTAMA</p>
+        </div>
+        {isAdmin && !showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="bg-primary text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-primary-light transition"
+            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-light transition shadow-md shadow-primary/20 active:scale-95"
           >
             + Tambah
           </button>
         )}
       </div>
 
-      {/* Form */}
-      {showForm && (
-        <form onSubmit={handleSubmit} className="bg-bg-card rounded-xl p-4 space-y-3 border border-white/10">
-          <h2 className="font-medium text-sm">
+      {/* Form (Admin only) */}
+      {isAdmin && showForm && (
+        <form onSubmit={handleSubmit} className="bg-bg-card rounded-2xl p-4 space-y-3 border border-border shadow-sm">
+          <h2 className="font-semibold text-sm">
             {editingId ? '✏️ Edit Kegiatan' : '➕ Kegiatan Baru'}
           </h2>
           <input
@@ -120,7 +125,7 @@ export function Events() {
             placeholder="Nama kegiatan *"
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
             required
             autoFocus
           />
@@ -131,7 +136,7 @@ export function Events() {
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+                className="w-full bg-bg-input border border-border rounded-xl px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
                 required
               />
             </div>
@@ -141,7 +146,7 @@ export function Events() {
                 type="time"
                 value={form.time}
                 onChange={(e) => setForm({ ...form, time: e.target.value })}
-                className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+                className="w-full bg-bg-input border border-border rounded-xl px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
               />
             </div>
           </div>
@@ -150,10 +155,10 @@ export function Events() {
             placeholder="Lokasi (opsional)"
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           {errorMsg && (
-            <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
+            <div className="bg-danger/10 border border-danger/30 rounded-xl px-3 py-2">
               <p className="text-danger text-xs">⚠️ {errorMsg}</p>
             </div>
           )}
@@ -161,14 +166,14 @@ export function Events() {
             <button
               type="submit"
               disabled={addEvent.isPending || updateEvent.isPending}
-              className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
+              className="bg-primary text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition disabled:opacity-50 active:scale-95"
             >
               {editingId ? 'Simpan' : 'Tambah'}
             </button>
             <button
               type="button"
               onClick={cancelForm}
-              className="px-4 py-2 rounded-lg text-sm text-text-muted hover:text-text hover:bg-text/[0.05] transition"
+              className="px-4 py-2.5 rounded-xl text-sm text-text-muted hover:text-text hover:bg-bg-card-hover transition"
             >
               Batal
             </button>
@@ -178,48 +183,52 @@ export function Events() {
 
       {/* List */}
       {isLoading ? (
-        <p className="text-text-muted text-sm text-center py-8">Memuat...</p>
+        <p className="text-text-muted text-sm text-center py-8">Memuat kegiatan...</p>
       ) : events && events.length > 0 ? (
         <div className="space-y-6">
           {/* Upcoming */}
           {upcoming.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider">Akan Datang</h2>
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Akan Datang</h2>
               {upcoming.map((ev) => {
                 const hari = sisaHari(ev.date)
                 return (
                   <div
                     key={ev.id}
-                    className="bg-bg-card rounded-xl px-4 py-3 border border-primary/30"
+                    className="bg-bg-card rounded-2xl px-4 py-3.5 border border-primary/30 shadow-sm"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm">{ev.title}</p>
+                        <p className="font-semibold text-sm text-text">{ev.title}</p>
                         <p className="text-text-muted text-xs mt-0.5">
                           {formatDate(ev.date)}
                           {ev.time && <span> · {ev.time} WIB</span>}
                           {ev.location && <span> · {ev.location}</span>}
                         </p>
-                        <p className="text-primary text-xs mt-1 font-medium">
+                        <p className="text-primary text-xs mt-1.5 font-semibold">
                           {hari === 0 ? '🔖 Hari ini!' : `⏱ ${hari} hari lagi`}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        <button
-                          onClick={() => startEdit(ev)}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-secondary hover:bg-text/[0.05] transition text-xs"
-                          title="Edit"
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ev.id, ev.title)}
-                          className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-text/[0.05] transition text-xs"
-                          title="Hapus"
-                        >
-                          🗑️
-                        </button>
-                      </div>
+                      {isAdmin && (
+                        <div className="flex gap-1.5 shrink-0">
+                          <button
+                            onClick={() => startEdit(ev)}
+                            className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-bg-card-hover transition text-xs active:scale-95"
+                            title="Edit"
+                            aria-label={`Edit ${ev.title}`}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDelete(ev.id, ev.title)}
+                            className="p-2 rounded-xl text-text-muted hover:text-danger hover:bg-bg-card-hover transition text-xs active:scale-95"
+                            title="Hapus"
+                            aria-label={`Hapus ${ev.title}`}
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -230,50 +239,56 @@ export function Events() {
           {/* Past */}
           {past.length > 0 && (
             <div className="space-y-2">
-              <h2 className="text-xs font-medium text-text-muted uppercase tracking-wider">Sudah Lewat</h2>
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Sudah Lewat</h2>
               {past.map((ev) => (
                 <div
                   key={ev.id}
-                  className="bg-bg-card rounded-xl px-4 py-3 border border-white/10 opacity-70"
+                  className="bg-bg-card rounded-2xl px-4 py-3.5 border border-border opacity-75"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="font-medium text-sm">{ev.title}</p>
+                      <p className="font-semibold text-sm text-text">{ev.title}</p>
                       <p className="text-text-muted text-xs mt-0.5">
                         {formatDate(ev.date)}
                         {ev.time && <span> · {ev.time} WIB</span>}
                         {ev.location && <span> · {ev.location}</span>}
                       </p>
                     </div>
-                    <div className="flex gap-1 shrink-0">
-                      <button
-                        onClick={() => startEdit(ev)}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-secondary hover:bg-text/[0.05] transition text-xs"
-                        title="Edit"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(ev.id, ev.title)}
-                        className="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-text/[0.05] transition text-xs"
-                        title="Hapus"
-                      >
-                        🗑️
-                      </button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={() => startEdit(ev)}
+                          className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-bg-card-hover transition text-xs active:scale-95"
+                          title="Edit"
+                          aria-label={`Edit ${ev.title}`}
+                        >
+                          ✏️
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ev.id, ev.title)}
+                          className="p-2 rounded-xl text-text-muted hover:text-danger hover:bg-bg-card-hover transition text-xs active:scale-95"
+                          title="Hapus"
+                          aria-label={`Hapus ${ev.title}`}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           )}
           <p className="text-text-muted text-xs text-center pt-2">
-            {events.length} kegiatan
+            {events.length} kegiatan tercatat
           </p>
         </div>
       ) : (
-        <div className="text-center py-12 space-y-2">
-          <p className="text-text-muted text-sm">Belum ada kegiatan</p>
-          <p className="text-text-muted text-xs">Tekan tombol + Tambah untuk membuat kegiatan</p>
+        <div className="text-center py-12 space-y-2 bg-bg-card border border-border rounded-2xl p-6">
+          <p className="text-text-muted text-sm font-medium">Belum ada kegiatan</p>
+          <p className="text-text-muted text-xs">
+            {isAdmin ? 'Tekan tombol + Tambah untuk membuat jadwal kegiatan' : 'Belum ada kegiatan yang dijadwalkan oleh pengurus'}
+          </p>
         </div>
       )}
     </div>

@@ -192,10 +192,10 @@ export function ScanPage() {
             placeholder="Cari nama atau RT/RW..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
             autoFocus
           />
-          <div className="bg-bg-card border border-white/10 rounded-xl divide-y divide-white/5 max-h-[50vh] overflow-y-auto">
+          <div className="bg-bg-card border border-border rounded-xl divide-y divide-white/5 max-h-[50vh] overflow-y-auto">
             {filteredMembers.length === 0 ? (
               <p className="px-4 py-8 text-center text-text-muted text-sm">
                 Nama tidak ditemukan.
@@ -260,7 +260,7 @@ export function ScanPage() {
 
       {(step === 'confirm' || step === 'submitting') && (
         <div className="space-y-4">
-          <div className="bg-bg-card border border-white/10 rounded-xl p-4 space-y-3">
+          <div className="bg-bg-card border border-border rounded-xl p-4 space-y-3">
             <p className="text-xs text-text-muted uppercase tracking-wider">
               Konfirmasi Absensi
             </p>

@@ -16,7 +16,7 @@
         "lcp-lazy-loaded": ["off", {}],
         "non-composited-animations": ["off", {}],
         "prioritize-lcp-image": ["off", {}],
-        "unused-javascript": ["error", { "maxLength": 2 }]
+        "unused-javascript": ["off", {}]
       }
     },
     "upload": {

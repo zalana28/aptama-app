@@ -20,8 +20,8 @@ export function BottomNav() {
               to={item.to}
               className={({ isActive }) =>
                 [
-                  'flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition',
-                  isActive ? 'text-secondary' : 'text-text-muted',
+                  'flex flex-col items-center justify-center gap-0.5 text-[10px] font-semibold transition active:scale-90 relative py-1',
+                  isActive ? 'text-primary' : 'text-text-muted hover:text-text',
                 ].join(' ')
               }
             >
@@ -29,13 +29,16 @@ export function BottomNav() {
                 <>
                   <div
                     className={[
-                      'grid h-8 w-8 place-items-center rounded-2xl transition',
-                      isActive ? 'bg-primary/20 text-primary' : 'text-text-muted',
+                      'grid h-8 w-12 place-items-center rounded-xl transition-all duration-200',
+                      isActive ? 'bg-primary/15 text-primary shadow-sm' : 'text-text-muted',
                     ].join(' ')}
                   >
-                    <Icon size={18} />
+                    <Icon size={19} strokeWidth={isActive ? 2.5 : 2} />
                   </div>
-                  {item.label}
+                  <span>{item.label}</span>
+                  {isActive && (
+                    <span className="h-1 w-1 rounded-full bg-primary absolute bottom-1" />
+                  )}
                 </>
               )}
             </NavLink>

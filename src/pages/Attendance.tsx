@@ -113,13 +113,31 @@ export function Attendance() {
   const selectedEv = events?.find((e) => e.id === selectedEvent)
   const hadir = members?.filter((m) => rowByMember.get(m.id)?.status === 'hadir').length ?? 0
   const izin = members?.filter((m) => rowByMember.get(m.id)?.status === 'izin').length ?? 0
-  const alfa = members ? members.length - hadir - izin : 0
+  const [statusFilter, setStatusFilter] = useState<'all' | 'hadir' | 'izin' | 'alfa'>('all')
+
+  const totalMembers = members?.length ?? 0
+  const hadirPct = totalMembers > 0 ? Math.round((hadir / totalMembers) * 100) : 0
+  const izinPct = totalMembers > 0 ? Math.round((izin / totalMembers) * 100) : 0
+  const alfaPct = totalMembers > 0 ? Math.max(0, 100 - hadirPct - izinPct) : 0
 
   const filtered = (members ?? []).filter((m) => {
+    const row = rowByMember.get(m.id)
+    const st = row?.status ?? 'alfa'
+
+    if (statusFilter === 'hadir' && st !== 'hadir') return false
+    if (statusFilter === 'izin' && st !== 'izin') return false
+    if (statusFilter === 'alfa' && st !== 'alfa') return false
+
     const q = search.trim().toLowerCase()
     if (!q) return true
     return m.name.toLowerCase().includes(q) || (m.group ?? '').toLowerCase().includes(q)
   })
+
+  function getInitials(name: string): string {
+    const parts = name.trim().split(/\s+/)
+    if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+    return (name[0] ?? '?').toUpperCase()
+  }
 
   async function setStatus(memberId: string, status: AttendanceStatus) {
     if (!selectedEvent) return
@@ -211,30 +229,85 @@ export function Attendance() {
       </select>
 
       {selectedEvent && members && members.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-success/10 border border-success/30 rounded-xl p-3 text-center">
-            <div className="text-lg font-bold text-success">{hadir}</div>
-            <div className="text-xs text-text-muted">Hadir</div>
+        <div className="space-y-3">
+          {/* Visual Percentage Progress Bar */}
+          <div className="bg-bg-card border border-border rounded-2xl p-4 space-y-2.5 shadow-sm">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-semibold text-text">Tingkat Kehadiran: <span className="text-primary font-bold">{hadirPct}%</span></span>
+              <span className="text-text-muted">{hadir} dari {totalMembers} Anggota</span>
+            </div>
+            <div className="h-3 w-full rounded-full bg-bg-elevated overflow-hidden flex border border-border">
+              <div style={{ width: `${hadirPct}%` }} className="bg-success transition-all duration-500" title={`Hadir: ${hadir}`} />
+              <div style={{ width: `${izinPct}%` }} className="bg-warning transition-all duration-500" title={`Izin: ${izin}`} />
+              <div style={{ width: `${alfaPct}%` }} className="bg-danger/60 transition-all duration-500" title={`Alfa: ${totalMembers - hadir - izin}`} />
+            </div>
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'hadir' ? 'all' : 'hadir')}
+                className={`rounded-xl p-2.5 text-center transition border ${statusFilter === 'hadir' ? 'bg-success/20 border-success shadow-sm' : 'bg-success/10 border-success/30 hover:bg-success/15'}`}
+              >
+                <div className="text-base font-bold text-success">{hadir}</div>
+                <div className="text-[10px] text-text-muted">Hadir ({hadirPct}%)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'izin' ? 'all' : 'izin')}
+                className={`rounded-xl p-2.5 text-center transition border ${statusFilter === 'izin' ? 'bg-warning/20 border-warning shadow-sm' : 'bg-warning/10 border-warning/30 hover:bg-warning/15'}`}
+              >
+                <div className="text-base font-bold text-warning">{izin}</div>
+                <div className="text-[10px] text-text-muted">Izin ({izinPct}%)</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === 'alfa' ? 'all' : 'alfa')}
+                className={`rounded-xl p-2.5 text-center transition border ${statusFilter === 'alfa' ? 'bg-danger/20 border-danger shadow-sm' : 'bg-danger/10 border-danger/30 hover:bg-danger/15'}`}
+              >
+                <div className="text-base font-bold text-danger">{totalMembers - hadir - izin}</div>
+                <div className="text-[10px] text-text-muted">Alfa ({alfaPct}%)</div>
+              </button>
+            </div>
           </div>
-          <div className="bg-warning/10 border border-warning/30 rounded-xl p-3 text-center">
-            <div className="text-lg font-bold text-warning">{izin}</div>
-            <div className="text-xs text-text-muted">Izin</div>
+
+          {/* Quick Filter Tabs */}
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border ${statusFilter === 'all' ? 'bg-primary text-white border-primary shadow-sm' : 'bg-bg-card border-border text-text-muted hover:text-text'}`}
+            >
+              Semua ({totalMembers})
+            </button>
+            <button
+              onClick={() => setStatusFilter('hadir')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border ${statusFilter === 'hadir' ? 'bg-success text-white border-success shadow-sm' : 'bg-bg-card border-border text-text-muted hover:text-text'}`}
+            >
+              Hadir ({hadir})
+            </button>
+            <button
+              onClick={() => setStatusFilter('izin')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border ${statusFilter === 'izin' ? 'bg-warning text-bg border-warning shadow-sm' : 'bg-bg-card border-border text-text-muted hover:text-text'}`}
+            >
+              Izin ({izin})
+            </button>
+            <button
+              onClick={() => setStatusFilter('alfa')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition border ${statusFilter === 'alfa' ? 'bg-danger text-white border-danger shadow-sm' : 'bg-bg-card border-border text-text-muted hover:text-text'}`}
+            >
+              Belum Absen ({totalMembers - hadir - izin})
+            </button>
           </div>
-          <div className="bg-danger/10 border border-danger/30 rounded-xl p-3 text-center">
-            <div className="text-lg font-bold text-danger">{alfa}</div>
-            <div className="text-xs text-text-muted">Alfa</div>
+
+          {/* Search Box */}
+          <div className="relative">
+            <input
+              type="search"
+              placeholder="Cari nama atau RT/RW di daftar..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full bg-bg-input border border-border rounded-xl px-4 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary shadow-sm"
+            />
           </div>
         </div>
-      )}
-
-      {selectedEvent && members && members.length > 0 && (
-        <input
-          type="search"
-          placeholder="Cari nama atau RT/RW..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full bg-bg-input border border-border rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
-        />
       )}
 
       {!selectedEvent ? (
@@ -259,7 +332,7 @@ export function Attendance() {
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2.5">
                         <input
                           type="checkbox"
                           checked={isPresent}
@@ -270,31 +343,34 @@ export function Attendance() {
                               action: isPresent ? 'undo' : 'present',
                             })
                           }
-                          className="h-4 w-4 rounded border-white/20 bg-bg-input accent-emerald-500"
+                          className="h-4 w-4 rounded border-border bg-bg-input accent-emerald-500 cursor-pointer"
                           title={isPresent ? 'Batalkan kehadiran' : 'Tandai hadir'}
                         />
-                        <p className="font-medium text-sm truncate flex items-center gap-1.5">
+                        <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary text-[10px] font-bold">
+                          {getInitials(m.name)}
+                        </div>
+                        <p className="font-semibold text-sm truncate flex items-center gap-1.5 text-text">
                           {m.name}
-                          {m.group && <span className="text-text-muted text-xs">({m.group})</span>}
+                          {m.group && <span className="text-text-muted text-xs font-normal">({m.group})</span>}
                         </p>
                       </div>
                       {row && isPresent && (
-                        <div className="mt-1.5 ml-6 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-text-muted">
+                        <div className="mt-1.5 ml-14 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-text-muted">
                           <span>⏱ {formatTime(row.check_in_at ?? row.submitted_at)}</span>
                           <span>{sourceLabel(row.attendance_source)}</span>
                           {row.attendance_source === 'member_signature' && (
                             <button
                               type="button"
                               onClick={() => openSignature(row)}
-                              className="text-primary hover:underline"
+                              className="text-primary font-semibold hover:underline"
                             >
-                              Lihat tanda tangan
+                              Lihat tanda tangan ✍️
                             </button>
                           )}
                         </div>
                       )}
                       {row?.note && (
-                        <p className="text-text-muted text-xs truncate mt-0.5 ml-6">
+                        <p className="text-warning text-xs truncate mt-0.5 ml-14 font-medium">
                           📝 {row.note}
                         </p>
                       )}

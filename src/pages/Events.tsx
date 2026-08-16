@@ -188,32 +188,91 @@ export function Events() {
         <div className="space-y-6">
           {/* Upcoming */}
           {upcoming.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Akan Datang</h2>
-              {upcoming.map((ev) => {
-                const hari = sisaHari(ev.date)
-                return (
+            <div className="space-y-2.5">
+              <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider px-1">Akan Datang ({upcoming.length})</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {upcoming.map((ev) => {
+                  const hari = sisaHari(ev.date)
+                  return (
+                    <div
+                      key={ev.id}
+                      className="bg-bg-card rounded-2xl p-4 border border-primary/30 shadow-xs flex flex-col justify-between"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <span className="inline-block text-[10px] font-bold text-primary px-2 py-0.5 rounded-md bg-primary/10 mb-1.5">
+                            {hari === 0 ? '🔥 Hari ini!' : `⏱ ${hari} hari lagi`}
+                          </span>
+                          <p className="font-bold text-sm text-text leading-snug">{ev.title}</p>
+                          <p className="text-text-muted text-xs mt-1">
+                            📅 {formatDate(ev.date)}
+                          </p>
+                          {ev.time && (
+                            <p className="text-text-muted text-xs mt-0.5">
+                              ⏰ {ev.time} WIB
+                            </p>
+                          )}
+                          {ev.location && (
+                            <p className="text-text-muted text-xs mt-0.5 flex items-center gap-1 truncate">
+                              📍 <span>{ev.location}</span>
+                            </p>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => startEdit(ev)}
+                              className="p-1.5 rounded-xl text-text-muted hover:text-primary hover:bg-primary/10 transition text-xs active:scale-95"
+                              title="Edit"
+                              aria-label={`Edit ${ev.title}`}
+                            >
+                              ✏️
+                            </button>
+                            <button
+                              onClick={() => handleDelete(ev.id, ev.title)}
+                              className="p-1.5 rounded-xl text-text-muted hover:text-danger hover:bg-danger/10 transition text-xs active:scale-95"
+                              title="Hapus"
+                              aria-label={`Hapus ${ev.title}`}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Past */}
+          {past.length > 0 && (
+            <div className="space-y-2.5 pt-2">
+              <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider px-1">Sudah Lewat ({past.length})</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {past.map((ev) => (
                   <div
                     key={ev.id}
-                    className="bg-bg-card rounded-2xl px-4 py-3.5 border border-primary/30 shadow-sm"
+                    className="bg-bg-card rounded-2xl p-4 border border-border opacity-75 flex flex-col justify-between"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm text-text">{ev.title}</p>
-                        <p className="text-text-muted text-xs mt-0.5">
-                          {formatDate(ev.date)}
-                          {ev.time && <span> · {ev.time} WIB</span>}
-                          {ev.location && <span> · {ev.location}</span>}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm text-text leading-snug">{ev.title}</p>
+                        <p className="text-text-muted text-xs mt-1">
+                          📅 {formatDate(ev.date)}
                         </p>
-                        <p className="text-primary text-xs mt-1.5 font-semibold">
-                          {hari === 0 ? '🔖 Hari ini!' : `⏱ ${hari} hari lagi`}
-                        </p>
+                        {ev.location && (
+                          <p className="text-text-muted text-xs mt-0.5 truncate">
+                            📍 {ev.location}
+                          </p>
+                        )}
                       </div>
                       {isAdmin && (
-                        <div className="flex gap-1.5 shrink-0">
+                        <div className="flex gap-1 shrink-0">
                           <button
                             onClick={() => startEdit(ev)}
-                            className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-bg-card-hover transition text-xs active:scale-95"
+                            className="p-1.5 rounded-xl text-text-muted hover:text-primary hover:bg-primary/10 transition text-xs active:scale-95"
                             title="Edit"
                             aria-label={`Edit ${ev.title}`}
                           >
@@ -221,7 +280,7 @@ export function Events() {
                           </button>
                           <button
                             onClick={() => handleDelete(ev.id, ev.title)}
-                            className="p-2 rounded-xl text-text-muted hover:text-danger hover:bg-bg-card-hover transition text-xs active:scale-95"
+                            className="p-1.5 rounded-xl text-text-muted hover:text-danger hover:bg-danger/10 transition text-xs active:scale-95"
                             title="Hapus"
                             aria-label={`Hapus ${ev.title}`}
                           >
@@ -231,52 +290,8 @@ export function Events() {
                       )}
                     </div>
                   </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Past */}
-          {past.length > 0 && (
-            <div className="space-y-2">
-              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Sudah Lewat</h2>
-              {past.map((ev) => (
-                <div
-                  key={ev.id}
-                  className="bg-bg-card rounded-2xl px-4 py-3.5 border border-border opacity-75"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm text-text">{ev.title}</p>
-                      <p className="text-text-muted text-xs mt-0.5">
-                        {formatDate(ev.date)}
-                        {ev.time && <span> · {ev.time} WIB</span>}
-                        {ev.location && <span> · {ev.location}</span>}
-                      </p>
-                    </div>
-                    {isAdmin && (
-                      <div className="flex gap-1.5 shrink-0">
-                        <button
-                          onClick={() => startEdit(ev)}
-                          className="p-2 rounded-xl text-text-muted hover:text-secondary hover:bg-bg-card-hover transition text-xs active:scale-95"
-                          title="Edit"
-                          aria-label={`Edit ${ev.title}`}
-                        >
-                          ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ev.id, ev.title)}
-                          className="p-2 rounded-xl text-text-muted hover:text-danger hover:bg-bg-card-hover transition text-xs active:scale-95"
-                          title="Hapus"
-                          aria-label={`Hapus ${ev.title}`}
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
           <p className="text-text-muted text-xs text-center pt-2">

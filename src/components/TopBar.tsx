@@ -6,7 +6,7 @@ export function TopBar() {
 
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-border bg-bg/80 backdrop-blur-xl pt-[env(safe-area-inset-top)]">
-      <div className="mx-auto flex h-14 w-full max-w-md items-center justify-between px-4">
+      <div className="mx-auto flex h-14 w-full max-w-md md:max-w-2xl lg:max-w-4xl items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <img
             src="/logos/aptama-logo-192.png"

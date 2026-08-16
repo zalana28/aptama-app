@@ -2,7 +2,7 @@ import { createContext, type ReactNode } from 'react'
 
 export type LoginResult =
   | { ok: true }
-  | { ok: false; errorCode: 'invalid_pin' | 'rate_limited'; retryAfter?: number }
+  | { ok: false; errorCode: 'invalid_pin' | 'rate_limited' | 'error'; retryAfter?: number; message?: string }
 
 export interface AdminCtx {
   isAdmin: boolean

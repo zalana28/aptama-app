@@ -236,31 +236,38 @@ export function Recap() {
           </div>
 
           {/* Action buttons */}
-          <div className="grid grid-cols-2 gap-2 pt-2">
+          <div className="space-y-2 pt-2">
             <button
               onClick={handleShare}
-              className="bg-[#25D366] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[#1eba57] transition"
+              className="w-full flex items-center justify-center gap-2 bg-[#25D366] text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-[#1eba57] transition shadow-md shadow-[#25D366]/20 active:scale-98"
             >
-              📱 Share ke WhatsApp
+              <span>📱</span>
+              <span>Bagikan Rekap ke WhatsApp Group</span>
             </button>
-            <button
-              onClick={handleExportCsv}
-              className="bg-secondary text-bg px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-secondary-light transition"
-            >
-              📄 CSV
-            </button>
-            <button
-              onClick={handleExportExcel}
-              className="bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition"
-            >
-              📊 Excel
-            </button>
-            <button
-              onClick={handleExportPdf}
-              className="bg-danger text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-red-600 transition"
-            >
-              🧾 PDF
-            </button>
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={handleExportPdf}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-danger/50 hover:text-danger transition active:scale-95 shadow-sm"
+              >
+                <span>📕</span>
+                <span>PDF</span>
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-success/50 hover:text-success transition active:scale-95 shadow-sm"
+              >
+                <span>📗</span>
+                <span>Excel</span>
+              </button>
+              <button
+                onClick={handleExportCsv}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-primary/50 transition active:scale-95 shadow-sm"
+              >
+                <span>📄</span>
+                <span>CSV</span>
+              </button>
+            </div>
           </div>
         </>
       )}

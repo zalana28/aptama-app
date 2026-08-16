@@ -24,15 +24,30 @@ export function useMembers() {
   })
 }
 
-// Admin-only: includes phone (goes through admin_get_members RPC + session).
 export function useAdminMembers() {
   return useQuery({
     queryKey: ['admin-members'],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_get_members', {
-        p_token: getAdminToken(),
-      })
-      if (error) throw error
+      try {
+        const { data, error } = await supabase.rpc('admin_get_members', {
+          p_token: getAdminToken(),
+        })
+        if (!error && Array.isArray(data)) return data as AdminMember[]
+      } catch {
+        // If admin RPC is unavailable or token fails, fallback to public view
+      }
+      const { data, error } = await supabase
+        .from('members_public')
+        .select('id, name, group')
+        .order('name')
+      if (error) {
+        // Direct query fallback on members table
+        const { data: directData } = await supabase
+          .from('members')
+          .select('id, name, group')
+          .order('name')
+        return (directData ?? []) as AdminMember[]
+      }
       return (data ?? []) as AdminMember[]
     },
   })

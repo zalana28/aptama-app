@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { QrCode, FileText, Calendar, PenLine } from 'lucide-react'
+import { QrCode, FileText, Calendar } from 'lucide-react'
 
 export function HomePage() {
   return (
@@ -16,33 +16,16 @@ export function HomePage() {
       <div className="space-y-3">
         <Link
           to="/scan-qr"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
+          className="block bg-bg-card border border-border rounded-2xl p-4 hover:border-primary/50 transition shadow-sm active:scale-[0.99]"
         >
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <QrCode size={20} />
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
+              <QrCode size={22} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Scan QR Absen</p>
-              <p className="text-xs text-text-muted mt-1">
-                Buka link QR dari ketua lalu tanda tangan untuk hadir.
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/checkin"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
-        >
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
-              <PenLine size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Check-in dari Rumah</p>
-              <p className="text-xs text-text-muted mt-1">
-                Absen sebelum jam mulai pakai tanda tangan digital.
+              <p className="font-semibold text-sm">Scan QR / Buka Absen</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Absen kegiatan dengan tanda tangan digital langsung dari HP.
               </p>
             </div>
           </div>
@@ -50,16 +33,16 @@ export function HomePage() {
 
         <Link
           to="/izin"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
+          className="block bg-bg-card border border-border rounded-2xl p-4 hover:border-secondary/50 transition shadow-sm active:scale-[0.99]"
         >
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
-              <FileText size={20} />
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
+              <FileText size={22} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-sm">Ajukan Izin</p>
-              <p className="text-xs text-text-muted mt-1">
-                Tidak bisa hadir? Kirim alasan privat ke ketua.
+              <p className="text-xs text-text-muted mt-0.5">
+                Tidak bisa hadir? Kirim alasan privat langsung ke ketua.
               </p>
             </div>
           </div>
@@ -67,20 +50,21 @@ export function HomePage() {
 
         <Link
           to="/kegiatan"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-success/50 transition"
+          className="block bg-bg-card border border-border rounded-2xl p-4 hover:border-success/50 transition shadow-sm active:scale-[0.99]"
         >
           <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-success/10 text-success shrink-0">
-              <Calendar size={20} />
+            <div className="grid h-11 w-11 place-items-center rounded-xl bg-success/10 text-success shrink-0">
+              <Calendar size={22} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Kegiatan Berikutnya</p>
-              <p className="text-xs text-text-muted mt-1">
-                Lihat jadwal dan countdown kegiatan.
+              <p className="font-semibold text-sm">Jadwal Kegiatan</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Lihat jadwal selapanan dan hitung mundur kegiatan berikutnya.
               </p>
             </div>
           </div>
         </Link>
+
       </div>
 
       <div className="bg-bg-card border border-border rounded-xl p-4">

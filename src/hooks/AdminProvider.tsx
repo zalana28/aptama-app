@@ -33,7 +33,11 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function login(pin: string): Promise<LoginResult> {
-    const { data } = await supabase.rpc('admin_login', { p_pin: pin })
+    const { data, error } = await supabase.rpc('admin_login', { p_pin: pin })
+    if (error) {
+      console.error('admin_login RPC error:', error)
+      return { ok: false, errorCode: 'error', message: error.message }
+    }
     const res = data as
       | { success: true; token: string; expires_at?: string }
       | { success: false; error_code?: string; retry_after?: number }

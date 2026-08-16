@@ -36,5 +36,8 @@ export function loginErrorMessage(result: LoginResult): string {
     const minutes = result.retryAfter ? Math.max(1, Math.ceil(result.retryAfter / 60)) : 5
     return `Terlalu banyak percobaan. Coba lagi dalam ${minutes} menit.`
   }
+  if (result.errorCode === 'error') {
+    return result.message || 'Gagal terhubung ke database. Periksa konfigurasi Supabase.'
+  }
   return 'PIN salah. Coba lagi.'
 }

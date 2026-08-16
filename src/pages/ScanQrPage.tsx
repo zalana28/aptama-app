@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Scan, PenLine } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { supabase } from '../lib/supabase'
 
@@ -39,76 +38,58 @@ export function ScanQrPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-3xl border border-border bg-bg-card p-5 text-center">
-          <p className="text-text-muted">Memuat QR aktif...</p>
+        <div className="rounded-3xl border border-border bg-bg-card p-6 text-center shadow-sm">
+          <p className="text-text-muted text-sm">Memuat QR aktif...</p>
         </div>
       ) : activeQrEvent ? (
-        <div className="rounded-3xl border border-primary/40 bg-bg-card p-5 text-center">
-          <h2 className="text-lg font-bold text-text">QR Absen Aktif</h2>
-          <p className="mt-1 text-sm text-text-muted">{activeQrEvent.title}</p>
-          <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-4 shadow-sm">
+        <div className="rounded-3xl border border-primary/40 bg-bg-card p-6 text-center space-y-4 shadow-sm">
+          <div>
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-primary/15 text-primary mb-2">
+              🟢 Absensi Sedang Dibuka
+            </span>
+            <h2 className="text-xl font-bold text-text">{activeQrEvent.title}</h2>
+            <p className="mt-1 text-xs text-text-muted">
+              {activeQrEvent.date} {activeQrEvent.time ? `· ${activeQrEvent.time} WIB` : ''} {activeQrEvent.location ? `· ${activeQrEvent.location}` : ''}
+            </p>
+          </div>
+
+          <div className="mx-auto w-fit rounded-2xl bg-white p-4 shadow-md">
             <QRCodeSVG
               value={`${window.location.origin}/scan?token=${activeQrEvent.checkin_token}`}
               size={220}
             />
           </div>
-          <p className="mt-3 text-xs text-text-muted">
-            Berlaku sampai:{' '}
-            {new Date(activeQrEvent.checkin_expires_at).toLocaleString('id-ID')}
+
+          <p className="text-xs text-text-muted">
+            Berlaku sampai: <span className="font-medium text-text">{new Date(activeQrEvent.checkin_expires_at).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</span>
           </p>
+
+          <Link
+            to={`/scan?token=${activeQrEvent.checkin_token}`}
+            className="flex items-center justify-center gap-2 w-full bg-primary text-white py-3.5 px-4 rounded-xl text-sm font-semibold hover:bg-primary-light transition active:scale-95 shadow-lg shadow-primary/20"
+          >
+            ✍️ Absen Sekarang (Buka Form Tanda Tangan)
+          </Link>
         </div>
       ) : (
-        <div className="rounded-3xl border border-border bg-bg-card p-5 text-center">
-          <p className="text-text-muted">
-            Belum ada QR aktif. Ketua perlu generate QR dulu di menu Pengurus.
+        <div className="rounded-3xl border border-border bg-bg-card p-8 text-center space-y-3 shadow-sm">
+          <div className="text-4xl">⏳</div>
+          <h2 className="text-base font-semibold text-text">Belum Ada QR Absen Aktif</h2>
+          <p className="text-xs text-text-muted max-w-xs mx-auto">
+            Ketua perlu mengaktifkan QR absensi terlebih dahulu di menu <strong>Pengurus → QR Absen</strong> saat kegiatan dimulai.
           </p>
         </div>
       )}
 
-      <div className="space-y-3">
-        <Link
-          to="/scan"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
-        >
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <Scan size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Scan QR Kegiatan</p>
-              <p className="text-xs text-text-muted mt-1">
-                Buka link QR lalu tanda tangan untuk absen.
-              </p>
-            </div>
-          </div>
-        </Link>
-
-        <Link
-          to="/checkin"
-          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
-        >
-          <div className="flex items-start gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
-              <PenLine size={20} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-sm">Check-in dari Rumah</p>
-              <p className="text-xs text-text-muted mt-1">
-                Absen sebelum jam mulai dengan tanda tangan digital.
-              </p>
-            </div>
-          </div>
-        </Link>
-      </div>
-
-      <div className="bg-bg-card border border-border rounded-xl p-4">
-        <h2 className="font-semibold text-sm mb-3">ℹ️ Catatan</h2>
-        <ul className="space-y-2 text-xs text-text-muted">
-          <li>• QR aktif hanya saat kegiatan berlangsung</li>
-          <li>• Pilih namamu lalu tanda tangan sebagai bukti kehadiran</li>
-          <li>• Tanda tangan tersimpan dan bisa dicek ketua</li>
-          <li>• Check-in dari rumah hanya bisa sebelum jam mulai kegiatan</li>
-        </ul>
+      <div className="bg-bg-card border border-border rounded-2xl p-5 shadow-sm">
+        <h2 className="font-semibold text-sm mb-3">📢 Cara Absen</h2>
+        <ol className="space-y-2.5 text-xs text-text-muted">
+          <li>1. Buka halaman ini saat kegiatan atau scan QR dari layar ketua</li>
+          <li>2. Klik tombol <strong>"Absen Sekarang"</strong> di atas</li>
+          <li>3. Cari dan pilih namamu di daftar anggota</li>
+          <li>4. Tanda tangan digital di kotak tanda tangan</li>
+          <li>5. Tekan tombol kirim dan kehadiranmu langsung tercatat!</li>
+        </ol>
       </div>
     </div>
   )

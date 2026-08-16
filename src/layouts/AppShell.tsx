@@ -8,7 +8,7 @@ export function AppShell() {
       <TopBar />
       <main
         id="main-content"
-        className="mx-auto min-h-screen w-full max-w-md px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-[calc(5rem+env(safe-area-inset-top))]"
+        className="mx-auto min-h-screen w-full max-w-md md:max-w-2xl lg:max-w-4xl px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-[calc(4.75rem+env(safe-area-inset-top))]"
       >
         <Outlet />
       </main>

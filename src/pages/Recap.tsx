@@ -174,7 +174,7 @@ export function Recap() {
       <select
         value={selectedEvent}
         onChange={(e) => setSelectedEvent(e.target.value)}
-        className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
+        className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:border-primary"
       >
         <option value="">— Pilih kegiatan —</option>
         {events?.map((ev) => (
@@ -192,7 +192,7 @@ export function Recap() {
         <>
           {/* Summary cards */}
           <div className="grid grid-cols-4 gap-2">
-            <div className="bg-bg-card border border-white/10 rounded-xl p-3 text-center">
+            <div className="bg-bg-card border border-border rounded-xl p-3 text-center">
               <div className="text-lg font-bold">{total}</div>
               <div className="text-xs text-text-muted">Total</div>
             </div>
@@ -212,7 +212,7 @@ export function Recap() {
 
           {/* Persentase */}
           {total > 0 && (
-            <div className="bg-bg-card rounded-xl p-3 border border-white/10">
+            <div className="bg-bg-card rounded-xl p-3 border border-border">
               <div className="flex items-center justify-between text-xs text-text-muted mb-1.5">
                 <span>Kehadiran</span>
                 <span className="font-medium text-text">
@@ -279,8 +279,8 @@ function StatusList({
 }) {
   if (items.length === 0) return null
   return (
-    <div className="bg-bg-card rounded-xl border border-white/10 overflow-hidden">
-      <div className="px-4 py-2 border-b border-white/10 flex items-center justify-between">
+    <div className="bg-bg-card rounded-xl border border-border overflow-hidden">
+      <div className="px-4 py-2 border-b border-border flex items-center justify-between">
         <span className={`text-sm font-medium ${color}`}>{title}</span>
         <span className="text-xs text-text-muted">{items.length} orang</span>
       </div>

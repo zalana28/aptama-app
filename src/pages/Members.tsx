@@ -91,7 +91,7 @@ export function Members() {
 
       {/* Form */}
       {showForm && (
-        <form onSubmit={handleSubmit} className="bg-bg-card rounded-xl p-4 space-y-3 border border-white/10">
+        <form onSubmit={handleSubmit} className="bg-bg-card rounded-xl p-4 space-y-3 border border-border">
           <h2 className="font-medium text-sm">
             {editingId ? '✏️ Edit Anggota' : '➕ Anggota Baru'}
           </h2>
@@ -100,7 +100,7 @@ export function Members() {
             placeholder="Nama lengkap *"
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
             required
             autoFocus
           />
@@ -109,14 +109,14 @@ export function Members() {
             placeholder="RT/RW atau divisi (opsional)"
             value={form.group}
             onChange={(e) => setForm({ ...form, group: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           <input
             type="tel"
             placeholder="No. HP (opsional)"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           {errorMsg && (
             <div className="bg-danger/10 border border-danger/30 rounded-lg px-3 py-2">
@@ -150,7 +150,7 @@ export function Members() {
           {members.map((m) => (
             <div
               key={m.id}
-              className="bg-bg-card rounded-xl px-4 py-3 flex items-center justify-between border border-white/10"
+              className="bg-bg-card rounded-xl px-4 py-3 flex items-center justify-between border border-border"
             >
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">{m.name}</p>

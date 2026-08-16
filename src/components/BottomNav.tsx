@@ -10,7 +10,7 @@ const items = [
 
 export function BottomNav() {
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-bg/90 backdrop-blur-xl">
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-bg/90 backdrop-blur-xl pb-[env(safe-area-inset-bottom)]">
       <div className="mx-auto grid h-16 w-full max-w-md grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon
@@ -21,7 +21,7 @@ export function BottomNav() {
               className={({ isActive }) =>
                 [
                   'flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition',
-                  isActive ? 'text-secondary' : 'text-zinc-500',
+                  isActive ? 'text-secondary' : 'text-text-muted',
                 ].join(' ')
               }
             >
@@ -30,7 +30,7 @@ export function BottomNav() {
                   <div
                     className={[
                       'grid h-8 w-8 place-items-center rounded-2xl transition',
-                      isActive ? 'bg-primary/20 text-primary' : 'text-zinc-500',
+                      isActive ? 'bg-primary/20 text-primary' : 'text-text-muted',
                     ].join(' ')}
                   >
                     <Icon size={18} />

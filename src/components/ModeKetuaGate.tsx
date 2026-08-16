@@ -54,17 +54,22 @@ export function ModeKetuaGate() {
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
               placeholder="Masukkan PIN"
-              className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-sm text-text focus:outline-none focus:border-primary"
+              className="w-full bg-bg-input border border-border rounded-xl px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary shadow-sm"
               required
+              autoFocus
             />
           </div>
 
-          {error && <p className="text-danger text-sm">{error}</p>}
+          {error && (
+            <div className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+              <p className="text-danger text-xs font-medium">⚠️ {error}</p>
+            </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-primary text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
+            className="w-full bg-primary text-white px-4 py-3.5 rounded-xl text-sm font-semibold hover:bg-primary-light transition disabled:opacity-50 active:scale-95 shadow-lg shadow-primary/20"
           >
             {loading ? 'Memverifikasi...' : '🔓 Masuk Mode Ketua'}
           </button>

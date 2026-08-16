@@ -94,7 +94,7 @@ export function ChangePin() {
             placeholder="PIN baru"
             value={newPin}
             onChange={(e) => setNewPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
             autoFocus
           />
         </div>
@@ -109,11 +109,11 @@ export function ChangePin() {
             placeholder="Ulangi PIN baru"
             value={confirmPin}
             onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
           />
         </div>
 
-        <div className="pt-2 border-t border-white/10">
+        <div className="pt-2 border-t border-border">
           <label className="text-xs text-text-muted mb-1 block">Recovery PIN (opsional)</label>
           <input
             type="password"
@@ -123,7 +123,7 @@ export function ChangePin() {
             placeholder="Atur recovery PIN"
             value={recoveryPin}
             onChange={(e) => setRecoveryPin(e.target.value.replace(/\D/g, ''))}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-lg px-4 py-3 text-center text-lg tracking-[0.3em] text-text focus:outline-none focus:border-primary"
           />
           <p className="text-[10px] text-text-muted mt-1">
             Recovery PIN dipakai kalau ketua lupa PIN. Default: 123456.

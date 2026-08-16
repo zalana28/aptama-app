@@ -17,7 +17,7 @@ export function RekapPage() {
         </p>
       </div>
 
-      <div className="flex gap-2 bg-bg-card border border-white/10 rounded-xl p-1">
+      <div className="flex gap-2 bg-bg-card border border-border rounded-xl p-1">
         <button
           onClick={() => setActiveTab('absen')}
           className={[
@@ -49,7 +49,7 @@ export function RekapPage() {
           </p>
           <Link
             to="/rekap"
-            className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-primary/50 transition"
+            className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
           >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
@@ -73,7 +73,7 @@ export function RekapPage() {
           </p>
           <Link
             to="/kegiatan"
-            className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+            className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
           >
             <div className="flex items-start gap-3">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">

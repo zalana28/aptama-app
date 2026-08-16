@@ -16,7 +16,7 @@ export function HomePage() {
       <div className="space-y-3">
         <Link
           to="/scan-qr"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-primary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
@@ -33,7 +33,7 @@ export function HomePage() {
 
         <Link
           to="/checkin"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
@@ -50,7 +50,7 @@ export function HomePage() {
 
         <Link
           to="/izin"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
@@ -67,7 +67,7 @@ export function HomePage() {
 
         <Link
           to="/kegiatan"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-success/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-success/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-success/10 text-success shrink-0">
@@ -83,7 +83,7 @@ export function HomePage() {
         </Link>
       </div>
 
-      <div className="bg-bg-card border border-white/10 rounded-xl p-4">
+      <div className="bg-bg-card border border-border rounded-xl p-4">
         <h2 className="font-semibold text-sm mb-3">📢 Cara Absen</h2>
         <ol className="space-y-2 text-xs text-text-muted">
           <li>1. Saat kegiatan, scan QR yang ditampilkan ketua</li>

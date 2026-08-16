@@ -85,7 +85,7 @@ export function PengurusDashboard() {
               key={item.title}
               type="button"
               onClick={() => navigate(item.to)}
-              className="w-full flex items-start gap-4 rounded-xl border border-white/10 bg-bg-card p-4 text-left hover:border-primary/50 transition active:scale-[0.98]"
+              className="w-full flex items-start gap-4 rounded-2xl border border-border bg-bg-card p-4 text-left hover:border-primary/50 transition active:scale-[0.98] shadow-sm"
             >
               <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
                 <Icon size={22} />

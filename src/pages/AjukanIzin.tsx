@@ -72,7 +72,7 @@ export function AjukanIzin() {
           <select
             value={memberId}
             onChange={(e) => setMemberId(e.target.value)}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
             required
           >
             <option value="">— Pilih nama —</option>
@@ -87,7 +87,7 @@ export function AjukanIzin() {
           <select
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
             required
           >
             <option value="">— Pilih kegiatan —</option>
@@ -105,19 +105,23 @@ export function AjukanIzin() {
             placeholder="Tulis alasan izin..."
             rows={3}
             required
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text placeholder:text-text-muted focus:outline-none focus:border-primary"
           />
           <p className="text-xs text-text-muted mt-1">
-            🔒 Alasan ini hanya bisa dilihat oleh ketua. Privasimu aman. <span className="text-warning">Wajib diisi.</span>
+            🔒 Alasan ini hanya bisa dilihat oleh ketua. Privasimu aman.
           </p>
         </div>
 
-        {error && <p className="text-danger text-sm">{error}</p>}
+        {error && (
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+            <p className="text-danger text-xs">⚠️ {error}</p>
+          </div>
+        )}
 
         <button
           type="submit"
           disabled={loading || !memberId || !eventId}
-          className="w-full bg-warning text-bg px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-warning/80 transition disabled:opacity-50"
+          className="w-full bg-warning text-bg px-4 py-3 rounded-xl text-sm font-semibold hover:bg-warning/80 transition disabled:opacity-50 active:scale-95 shadow-md shadow-warning/20"
         >
           {loading ? 'Mengirim...' : '📤 Kirim Izin'}
         </button>

@@ -39,27 +39,27 @@ export function ScanQrPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-center">
-          <p className="text-zinc-400">Memuat QR aktif...</p>
+        <div className="rounded-3xl border border-border bg-bg-card p-5 text-center">
+          <p className="text-text-muted">Memuat QR aktif...</p>
         </div>
       ) : activeQrEvent ? (
-        <div className="rounded-3xl border border-[#1B7A3D]/40 bg-white/[0.06] p-5 text-center">
-          <h2 className="text-lg font-bold">QR Absen Aktif</h2>
-          <p className="mt-1 text-sm text-zinc-400">{activeQrEvent.title}</p>
-          <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-4">
+        <div className="rounded-3xl border border-primary/40 bg-bg-card p-5 text-center">
+          <h2 className="text-lg font-bold text-text">QR Absen Aktif</h2>
+          <p className="mt-1 text-sm text-text-muted">{activeQrEvent.title}</p>
+          <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-4 shadow-sm">
             <QRCodeSVG
               value={`${window.location.origin}/scan?token=${activeQrEvent.checkin_token}`}
               size={220}
             />
           </div>
-          <p className="mt-3 text-xs text-zinc-500">
+          <p className="mt-3 text-xs text-text-muted">
             Berlaku sampai:{' '}
             {new Date(activeQrEvent.checkin_expires_at).toLocaleString('id-ID')}
           </p>
         </div>
       ) : (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 text-center">
-          <p className="text-zinc-400">
+        <div className="rounded-3xl border border-border bg-bg-card p-5 text-center">
+          <p className="text-text-muted">
             Belum ada QR aktif. Ketua perlu generate QR dulu di menu Pengurus.
           </p>
         </div>
@@ -68,7 +68,7 @@ export function ScanQrPage() {
       <div className="space-y-3">
         <Link
           to="/scan"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-primary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-primary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
@@ -85,7 +85,7 @@ export function ScanQrPage() {
 
         <Link
           to="/checkin"
-          className="block bg-bg-card border border-white/10 rounded-xl p-4 hover:border-secondary/50 transition"
+          className="block bg-bg-card border border-border rounded-xl p-4 hover:border-secondary/50 transition"
         >
           <div className="flex items-start gap-3">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-secondary/10 text-secondary shrink-0">
@@ -101,7 +101,7 @@ export function ScanQrPage() {
         </Link>
       </div>
 
-      <div className="bg-bg-card border border-white/10 rounded-xl p-4">
+      <div className="bg-bg-card border border-border rounded-xl p-4">
         <h2 className="font-semibold text-sm mb-3">ℹ️ Catatan</h2>
         <ul className="space-y-2 text-xs text-text-muted">
           <li>• QR aktif hanya saat kegiatan berlangsung</li>

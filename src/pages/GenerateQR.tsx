@@ -94,7 +94,7 @@ export function GenerateQR() {
           <select
             value={selectedEvent}
             onChange={(e) => { setSelectedEvent(e.target.value); setQrUrl(''); setToken('') }}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
           >
             <option value="">— Pilih kegiatan —</option>
             {events?.map((ev) => (
@@ -108,7 +108,7 @@ export function GenerateQR() {
           <select
             value={duration}
             onChange={(e) => setDuration(Number(e.target.value))}
-            className="w-full bg-bg-input border border-white/10 rounded-lg px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
+            className="w-full bg-bg-input border border-border rounded-xl px-3 py-2.5 text-sm text-text focus:outline-none focus:border-primary"
           >
             <option value={30}>30 menit</option>
             <option value={60}>1 jam</option>
@@ -117,12 +117,16 @@ export function GenerateQR() {
           </select>
         </div>
 
-        {error && <p className="text-danger text-sm">{error}</p>}
+        {error && (
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+            <p className="text-danger text-xs">⚠️ {error}</p>
+          </div>
+        )}
 
         <button
           onClick={handleGenerate}
           disabled={loading || !selectedEvent}
-          className="w-full bg-primary text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-primary-light transition disabled:opacity-50"
+          className="w-full bg-primary text-white px-4 py-3 rounded-xl text-sm font-semibold hover:bg-primary-light transition disabled:opacity-50 active:scale-95 shadow-md shadow-primary/20"
         >
           {loading ? 'Generating...' : '🔲 Generate QR Code'}
         </button>

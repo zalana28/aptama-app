@@ -60,9 +60,12 @@ export function ScanQrPage() {
       </div>
 
       {isLoading ? (
-        <div className="rounded-3xl border border-border bg-bg-card p-8 text-center shadow-sm">
-          <div className="mx-auto h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin mb-3" />
-          <p className="text-text-muted text-sm">Mengecek sesi QR aktif...</p>
+        <div className="rounded-3xl border border-border bg-bg-card p-6 text-center space-y-4 shadow-sm animate-fade-in">
+          <div className="h-6 w-32 mx-auto bg-bg-elevated rounded-full animate-shimmer border border-border/50" />
+          <div className="h-6 w-48 mx-auto bg-bg-elevated rounded-xl animate-shimmer border border-border/50" />
+          <div className="h-4 w-36 mx-auto bg-bg-elevated/60 rounded-lg animate-shimmer border border-border/40" />
+          <div className="mx-auto w-[220px] h-[220px] rounded-2xl bg-bg-elevated animate-shimmer border border-border/60" />
+          <div className="h-12 w-full bg-bg-elevated rounded-xl animate-shimmer border border-border/50" />
         </div>
       ) : activeQrEvent ? (
         <motion.div

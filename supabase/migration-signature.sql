@@ -248,6 +248,8 @@ DECLARE
 BEGIN
   -- Serialize concurrent attempts so the rate-limit check + record is atomic.
   PERFORM pg_advisory_xact_lock(hashtext('aptama_admin_login'));
+  -- Housekeeping: purge expired sessions (cheap, amortized).
+  DELETE FROM admin_sessions WHERE expires_at < now();
 
   -- Rate limit: max 5 failures per 5 minutes (rolling window).
   SELECT count(*) INTO v_fail_count
@@ -1124,7 +1126,7 @@ BEGIN
     ALTER FUNCTION public.submit_izin(uuid, uuid, text) SET search_path = public;
   END IF;
   IF EXISTS (SELECT 1 FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'admin_reset_pin') THEN
-    ALTER FUNCTION public.admin_reset_pin(text, text) SET search_path = public;
+    ALTER FUNCTION public.admin_reset_pin(text, text) SET search_path = public, extensions;
   END IF;
 END $$;
 
@@ -1146,3 +1148,5 @@ DROP FUNCTION IF EXISTS public.get_member_descriptor(uuid);
 DROP FUNCTION IF EXISTS public.check_in_with_face(uuid, text, uuid, numeric, text, text);
 DROP FUNCTION IF EXISTS public.check_in_with_face(uuid, float8[], text, text, uuid);
 DROP FUNCTION IF EXISTS public.admin_mark_manual_attendance(text, uuid, uuid, text);
+DROP FUNCTION IF EXISTS public.generate_qr_token(uuid, text, int);
+DROP FUNCTION IF EXISTS public.get_active_qr_tokens(uuid);

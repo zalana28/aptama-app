@@ -71,3 +71,33 @@ export function useDeleteEvent() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['events'] }),
   })
 }
+
+export function useCloseCheckinQr() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (eventId: string) => {
+      const token = getAdminToken()
+      // Try dedicated RPC admin_close_checkin_qr first
+      const { error: rpcError } = await supabase.rpc('admin_close_checkin_qr', {
+        p_token: token,
+        p_event_id: eventId,
+      })
+
+      if (rpcError) {
+        // Fallback: update checkin_close_at to now() via admin_update_event
+        const { error: fallbackError } = await supabase.rpc('admin_update_event', {
+          p_token: token,
+          p_event_id: eventId,
+          p_checkin_close_at: new Date().toISOString(),
+        })
+        if (fallbackError) throw rpcError
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['events'] })
+      qc.invalidateQueries({ queryKey: ['active-qr-events'] })
+      qc.refetchQueries({ queryKey: ['active-qr-events'] })
+    },
+  })
+}
+

@@ -1,5 +1,5 @@
 import { useEffect, useState, Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AdminProvider } from './hooks/AdminProvider'
@@ -20,7 +20,6 @@ const Members = lazy(() => import('./pages/Members').then((m) => ({ default: m.M
 const Events = lazy(() => import('./pages/Events').then((m) => ({ default: m.Events })))
 const Attendance = lazy(() => import('./pages/Attendance').then((m) => ({ default: m.Attendance })))
 const AjukanIzin = lazy(() => import('./pages/AjukanIzin').then((m) => ({ default: m.AjukanIzin })))
-const CheckInPage = lazy(() => import('./pages/CheckInPage').then((m) => ({ default: m.CheckInPage })))
 const GenerateQR = lazy(() => import('./pages/GenerateQR').then((m) => ({ default: m.GenerateQR })))
 const ScanPage = lazy(() => import('./pages/ScanPage').then((m) => ({ default: m.ScanPage })))
 const ImportData = lazy(() => import('./pages/ImportData').then((m) => ({ default: m.ImportData })))
@@ -108,7 +107,7 @@ function MainApp() {
               <Route path="absensi" element={<AdminGate><Attendance /></AdminGate>} />
               <Route path="generate-qr" element={<AdminGate><GenerateQR /></AdminGate>} />
               <Route path="izin" element={<AjukanIzin />} />
-              <Route path="checkin" element={<CheckInPage />} />
+              <Route path="checkin" element={<Navigate to="/scan-qr" replace />} />
               <Route path="scan" element={<ScanPage />} />
               <Route path="import" element={<AdminGate><ImportData /></AdminGate>} />
               <Route path="ganti-pin" element={<AdminGate><ChangePin /></AdminGate>} />

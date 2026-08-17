@@ -13,13 +13,15 @@ import {
   AlertTriangle,
   FileSignature,
   X,
+  Search,
 } from 'lucide-react'
 import { useEvents, useCloseCheckinQr } from '../hooks/useEvents'
 import { useMembers } from '../hooks/useMembers'
 import { useAdmin } from '../hooks/useAdmin'
+import { useAttendanceByEvent, useAdminAttendanceByEvent } from '../hooks/useAttendance'
 import { getAdminToken } from '../lib/admin'
 import { supabase } from '../lib/supabase'
-import type { Attendance, Member } from '../types'
+import type { AdminAttendanceRow, Member } from '../types'
 
 interface ActiveQr {
   event_id: string
@@ -39,10 +41,12 @@ function getInitials(name: string): string {
 
 function formatTime(isoStr?: string | null): string {
   if (!isoStr) return '-'
-  return new Date(isoStr).toLocaleTimeString('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }) + ' WIB'
+  return (
+    new Date(isoStr).toLocaleTimeString('id-ID', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' WIB'
+  )
 }
 
 export function GenerateQR() {
@@ -60,6 +64,8 @@ export function GenerateQR() {
   const [showCloseModal, setShowCloseModal] = useState(false)
   const [sigModal, setSigModal] = useState<{ name: string; url: string } | null>(null)
   const [liveNewIds, setLiveNewIds] = useState<Set<string>>(new Set())
+  const [filterTab, setFilterTab] = useState<'hadir' | 'izin' | 'alfa' | 'all'>('hadir')
+  const [search, setSearch] = useState('')
 
   // Query if there is already an active QR session
   const { data: activeQrEvent } = useQuery({
@@ -85,29 +91,17 @@ export function GenerateQR() {
   const activeEventId = activeQrEvent?.event_id || selectedEvent
   const currentEvent = events.find((e) => e.id === activeEventId)
 
-  // Realtime Live Attendance for active event
-  const { data: attendances = [], refetch: refetchAttendances } = useQuery({
-    queryKey: ['event-live-attendances', activeEventId],
-    queryFn: async () => {
-      if (!activeEventId) return []
-      const { data, error } = await supabase
-        .from('attendances')
-        .select('*')
-        .eq('event_id', activeEventId)
-        .order('submitted_at', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as Attendance[]
-    },
-    enabled: Boolean(activeEventId),
-    refetchInterval: 3000,
-  })
+  // Use reliable attendance query hooks with session token / public view fallback
+  const { data: publicRows = [] } = useAttendanceByEvent(activeEventId)
+  const { data: adminRows = [] } = useAdminAttendanceByEvent(activeEventId)
+  const attendanceRows = (isAdmin ? adminRows : publicRows) as AdminAttendanceRow[]
 
   // Supabase Realtime WebSocket listener
   useEffect(() => {
     if (!activeEventId) return
 
     const channel = supabase
-      .channel(`live-qr-${activeEventId}`)
+      .channel(`generate-qr-live-${activeEventId}`)
       .on(
         'postgres_changes',
         {
@@ -118,19 +112,21 @@ export function GenerateQR() {
         },
         (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-            const newRow = payload.new as Attendance
+            const newRow = payload.new as { member_id?: string }
             if (newRow?.member_id) {
-              setLiveNewIds((prev) => new Set([...prev, newRow.member_id]))
+              setLiveNewIds((prev) => new Set([...prev, newRow.member_id!]))
               setTimeout(() => {
                 setLiveNewIds((prev) => {
                   const next = new Set(prev)
-                  next.delete(newRow.member_id)
+                  next.delete(newRow.member_id!)
                   return next
                 })
               }, 6000)
             }
           }
-          refetchAttendances()
+          qc.invalidateQueries({ queryKey: ['attendance', activeEventId] })
+          qc.invalidateQueries({ queryKey: ['admin_attendance', activeEventId] })
+          qc.refetchQueries({ queryKey: ['admin_attendance', activeEventId] })
         }
       )
       .subscribe()
@@ -138,23 +134,61 @@ export function GenerateQR() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [activeEventId, refetchAttendances])
+  }, [activeEventId, qc])
 
-  // Member map for quick lookup
-  const memberMap = useMemo(() => {
-    const map = new Map<string, Member>()
-    members.forEach((m) => map.set(m.id, m))
+
+  // Attendance map by member ID
+  const attendanceMap = useMemo(() => {
+    const map = new Map<string, AdminAttendanceRow>()
+    attendanceRows.forEach((r) => map.set(r.member_id, r))
     return map
-  }, [members])
+  }, [attendanceRows])
 
-  // Present members list
-  const presentRows = useMemo(() => {
-    return attendances.filter((r) => r.status === 'hadir')
-  }, [attendances])
+  // Breakdown lists
+  const { hadirList, izinList, alfaList } = useMemo(() => {
+    const hadir: { member: Member; row?: AdminAttendanceRow }[] = []
+    const izin: { member: Member; row?: AdminAttendanceRow }[] = []
+    const alfa: { member: Member; row?: AdminAttendanceRow }[] = []
+
+    members.forEach((m) => {
+      const row = attendanceMap.get(m.id)
+      if (row?.status === 'hadir') {
+        hadir.push({ member: m, row })
+      } else if (row?.status === 'izin') {
+        izin.push({ member: m, row })
+      } else {
+        alfa.push({ member: m, row })
+      }
+    })
+
+    return { hadirList: hadir, izinList: izin, alfaList: alfa }
+  }, [members, attendanceMap])
 
   const totalMembers = members.length || 50
-  const hadirCount = presentRows.length
+  const hadirCount = hadirList.length
   const hadirPct = Math.round((hadirCount / totalMembers) * 100)
+
+  // Current display list based on tab & search
+  const displayList = useMemo(() => {
+    let source =
+      filterTab === 'hadir'
+        ? hadirList
+        : filterTab === 'izin'
+        ? izinList
+        : filterTab === 'alfa'
+        ? alfaList
+        : [...hadirList, ...izinList, ...alfaList]
+
+    const q = search.trim().toLowerCase()
+    if (!q) return source
+
+    return source.filter(
+      (item) =>
+        item.member.name.toLowerCase().includes(q) ||
+        (item.member.group ?? '').toLowerCase().includes(q) ||
+        (item.row?.note ?? '').toLowerCase().includes(q)
+    )
+  }, [filterTab, hadirList, izinList, alfaList, search])
 
   async function handleGenerate() {
     if (!selectedEvent) return
@@ -185,7 +219,7 @@ export function GenerateQR() {
     await qc.invalidateQueries({ queryKey: ['events'] })
     await qc.invalidateQueries({ queryKey: ['active-qr-events'] })
     await qc.refetchQueries({ queryKey: ['active-qr-events'] })
-    refetchAttendances()
+    qc.refetchQueries({ queryKey: ['admin_attendance', selectedEvent] })
   }
 
   async function handleCloseQr() {
@@ -207,9 +241,8 @@ export function GenerateQR() {
     setTimeout(() => setCopied(false), 2500)
   }
 
-  async function viewSignature(row: Attendance) {
-    if (!row.signature_path) return
-    const mem = memberMap.get(row.member_id)
+  async function viewSignature(row?: AdminAttendanceRow, memberName?: string) {
+    if (!row?.signature_path) return
     try {
       const { data, error } = await supabase.rpc('admin_get_signature_url', {
         p_token: getAdminToken(),
@@ -219,7 +252,7 @@ export function GenerateQR() {
         alert('Gagal memuat tanda tangan.')
         return
       }
-      setSigModal({ name: mem?.name ?? 'Anggota', url: data })
+      setSigModal({ name: memberName ?? 'Anggota', url: data })
     } catch {
       alert('Gagal memuat tanda tangan.')
     }
@@ -317,7 +350,7 @@ export function GenerateQR() {
           </div>
 
           {/* Live Attendance Monitor Widget */}
-          <div className="bg-bg-card rounded-3xl border border-primary/30 p-5 space-y-3.5 shadow-sm">
+          <div className="bg-bg-card rounded-3xl border border-primary/30 p-5 space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
@@ -331,7 +364,7 @@ export function GenerateQR() {
               </span>
             </div>
 
-            {/* Visual Mini Progress */}
+            {/* Visual Progress Bar */}
             <div className="space-y-1.5">
               <div className="h-2.5 w-full rounded-full bg-bg-elevated overflow-hidden border border-border">
                 <div
@@ -344,67 +377,169 @@ export function GenerateQR() {
               </p>
             </div>
 
-            {/* List of Attendees in Realtime */}
-            <div className="space-y-2 pt-1">
-              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider">
-                Daftar yang Sudah Absen ({presentRows.length})
-              </h4>
+            {/* Interactive Status Filter Tabs */}
+            <div className="grid grid-cols-4 gap-1.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setFilterTab('hadir')}
+                className={`rounded-xl py-2 px-1 text-center transition border ${
+                  filterTab === 'hadir'
+                    ? 'bg-success/25 border-success text-success font-bold shadow-xs'
+                    : 'bg-success/5 border-success/20 text-success/80 hover:bg-success/10'
+                }`}
+              >
+                <div className="text-xs">{hadirList.length}</div>
+                <div className="text-[10px] truncate">✅ Hadir</div>
+              </button>
 
-              {presentRows.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setFilterTab('izin')}
+                className={`rounded-xl py-2 px-1 text-center transition border ${
+                  filterTab === 'izin'
+                    ? 'bg-warning/25 border-warning text-warning font-bold shadow-xs'
+                    : 'bg-warning/5 border-warning/20 text-warning/80 hover:bg-warning/10'
+                }`}
+              >
+                <div className="text-xs">{izinList.length}</div>
+                <div className="text-[10px] truncate">📝 Izin</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterTab('alfa')}
+                className={`rounded-xl py-2 px-1 text-center transition border ${
+                  filterTab === 'alfa'
+                    ? 'bg-danger/25 border-danger text-danger font-bold shadow-xs'
+                    : 'bg-danger/5 border-danger/20 text-danger/80 hover:bg-danger/10'
+                }`}
+              >
+                <div className="text-xs">{alfaList.length}</div>
+                <div className="text-[10px] truncate">❌ Belum</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setFilterTab('all')}
+                className={`rounded-xl py-2 px-1 text-center transition border ${
+                  filterTab === 'all'
+                    ? 'bg-primary/25 border-primary text-text font-bold shadow-xs'
+                    : 'bg-bg-elevated border-border text-text-muted hover:border-primary/30'
+                }`}
+              >
+                <div className="text-xs">{totalMembers}</div>
+                <div className="text-[10px] truncate">Semua</div>
+              </button>
+            </div>
+
+            {/* Instant Search Bar */}
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                type="search"
+                placeholder="Cari nama pemuda..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full bg-bg-input border border-border rounded-xl pl-9 pr-8 py-2 text-xs text-text placeholder:text-text-muted focus:outline-none focus:border-primary shadow-xs"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+
+            {/* Realtime Attendance Feed */}
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {displayList.length === 0 ? (
                 <div className="text-center py-6 border border-dashed border-border rounded-2xl bg-bg-elevated/40">
                   <p className="text-xs text-text-muted">
-                    Belum ada anggota yang scan. Daftar akan otomatis terisi saat anggota absen.
+                    {search ? 'Tidak ada nama yang cocok.' : 'Belum ada data pada kategori ini.'}
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-                  {presentRows.map((row, idx) => {
-                    const member = memberMap.get(row.member_id)
-                    const isNew = liveNewIds.has(row.member_id)
+                displayList.map((item, idx) => {
+                  const isHadir = item.row?.status === 'hadir'
+                  const isIzin = item.row?.status === 'izin'
+                  const isNew = liveNewIds.has(item.member.id)
 
-                    return (
-                      <motion.div
-                        key={row.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className={`rounded-2xl p-2.5 flex items-center justify-between border transition shadow-xs ${
-                          isNew
-                            ? 'bg-success/20 border-success ring-2 ring-success animate-pulse'
-                            : 'bg-bg-elevated/70 border-border'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <span className="text-[10px] font-bold text-text-muted w-4 text-center">
-                            {idx + 1}.
-                          </span>
-                          <div className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary text-[10px] font-bold">
-                            {getInitials(member?.name ?? row.member_id)}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-xs text-text truncate">
-                              {member?.name ?? 'Anggota'}
-                            </p>
-                            <p className="text-[10px] text-text-muted flex items-center gap-1">
-                              <span>⏱ {formatTime(row.check_in_at ?? row.submitted_at)}</span>
-                              {member?.group && <span>· {member.group}</span>}
-                            </p>
-                          </div>
+                  return (
+                    <motion.div
+                      key={item.member.id}
+                      initial={{ opacity: 0, y: 3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`rounded-2xl p-2.5 flex items-center justify-between border transition shadow-xs ${
+                        isNew
+                          ? 'bg-success/20 border-success ring-2 ring-success animate-pulse'
+                          : isHadir
+                          ? 'bg-success/5 border-success/30'
+                          : isIzin
+                          ? 'bg-warning/5 border-warning/30'
+                          : 'bg-bg-elevated/60 border-border'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-[10px] font-bold text-text-muted w-4 text-center">
+                          {idx + 1}.
+                        </span>
+                        <div
+                          className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg text-[10px] font-bold ${
+                            isHadir
+                              ? 'bg-success/20 text-success'
+                              : isIzin
+                              ? 'bg-warning/20 text-warning'
+                              : 'bg-text/10 text-text-muted'
+                          }`}
+                        >
+                          {getInitials(item.member.name)}
                         </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-xs text-text truncate">
+                            {item.member.name}
+                          </p>
+                          <p className="text-[10px] text-text-muted flex items-center gap-1 truncate">
+                            {isHadir ? (
+                              <span>⏱ {formatTime(item.row?.check_in_at ?? item.row?.submitted_at)}</span>
+                            ) : isIzin ? (
+                              <span className="text-warning">📝 Izin {item.row?.note ? `(${item.row.note})` : ''}</span>
+                            ) : (
+                              <span>Belum Absen</span>
+                            )}
+                            {item.member.group && <span>· {item.member.group}</span>}
+                          </p>
+                        </div>
+                      </div>
 
-                        {row.signature_path && (
+                      {/* Right Action / Badge */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isHadir && item.row?.signature_path && (
                           <button
                             type="button"
-                            onClick={() => viewSignature(row)}
-                            className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline bg-primary/10 px-2 py-1 rounded-lg shrink-0"
+                            onClick={() => viewSignature(item.row, item.member.name)}
+                            className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:underline bg-primary/10 px-2 py-1 rounded-lg"
                           >
                             <FileSignature size={12} />
                             <span>Lihat TTD</span>
                           </button>
                         )}
-                      </motion.div>
-                    )
-                  })}
-                </div>
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-md ${
+                            isHadir
+                              ? 'bg-success text-white'
+                              : isIzin
+                              ? 'bg-warning text-bg'
+                              : 'bg-text/10 text-text-muted'
+                          }`}
+                        >
+                          {isHadir ? 'Hadir' : isIzin ? 'Izin' : 'Belum'}
+                        </span>
+                      </div>
+                    </motion.div>
+                  )
+                })
               )}
             </div>
           </div>

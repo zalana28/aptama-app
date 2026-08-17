@@ -84,20 +84,22 @@ export function useCloseCheckinQr() {
       })
 
       if (rpcError) {
-        // Fallback: update checkin_close_at to now() via admin_update_event
-        const { error: fallbackError } = await supabase.rpc('admin_update_event', {
+        // Robust Fallback: expire checkin session immediately by passing -1 minutes to existing admin_generate_checkin_qr RPC
+        const { error: fallbackError } = await supabase.rpc('admin_generate_checkin_qr', {
           p_token: token,
           p_event_id: eventId,
-          p_checkin_close_at: new Date().toISOString(),
+          p_minutes: -1,
         })
-        if (fallbackError) throw rpcError
+        if (fallbackError) throw fallbackError
       }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['events'] })
       qc.invalidateQueries({ queryKey: ['active-qr-events'] })
+      qc.setQueryData(['active-qr-events'], null)
       qc.refetchQueries({ queryKey: ['active-qr-events'] })
     },
   })
 }
+
 

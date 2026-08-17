@@ -16,26 +16,42 @@ export function useAttendanceByEvent(eventId: string) {
       return (data ?? []) as Attendance[]
     },
     enabled: !!eventId,
+    refetchInterval: 3000, // Live polling setiap 3 detik
+    staleTime: 1000,
   })
 }
 
 /**
  * Ketua-only: full attendance rows (note, signature_path, check_in_at,
  * verified_by, member_name) via admin_get_attendance_v2 (session token).
+ * Jika RPC gagal / error, otomatis fallback ke attendance_public view.
  */
 export function useAdminAttendanceByEvent(eventId: string) {
   const { isAdmin } = useAdmin()
   return useQuery({
     queryKey: ['admin_attendance', eventId, isAdmin],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('admin_get_attendance_v2', {
-        p_event_id: eventId,
-        p_token: getAdminToken(),
-      })
-      if (error) throw error
-      return (data ?? []) as AdminAttendanceRow[]
+      try {
+        const token = getAdminToken()
+        const { data, error } = await supabase.rpc('admin_get_attendance_v2', {
+          p_event_id: eventId,
+          p_token: token,
+        })
+        if (error) throw error
+        return (data ?? []) as AdminAttendanceRow[]
+      } catch {
+        // Fallback aman: ambil data dari public view jika admin RPC gagal
+        const { data, error } = await supabase
+          .from('attendance_public')
+          .select('*')
+          .eq('event_id', eventId)
+        if (error) return []
+        return (data ?? []) as AdminAttendanceRow[]
+      }
     },
     enabled: !!eventId && isAdmin,
+    refetchInterval: 3000, // Live polling setiap 3 detik
+    staleTime: 1000,
   })
 }
 

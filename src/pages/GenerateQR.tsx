@@ -92,9 +92,20 @@ export function GenerateQR() {
   const currentEvent = events.find((e) => e.id === activeEventId)
 
   // Use reliable attendance query hooks with session token / public view fallback
-  const { data: publicRows = [] } = useAttendanceByEvent(activeEventId)
-  const { data: adminRows = [] } = useAdminAttendanceByEvent(activeEventId)
-  const attendanceRows = (isAdmin ? adminRows : publicRows) as AdminAttendanceRow[]
+  const { data: publicRows = [], refetch: refetchPublic } = useAttendanceByEvent(activeEventId)
+  const { data: adminRows = [], refetch: refetchAdmin } = useAdminAttendanceByEvent(activeEventId)
+  // Prioritaskan adminRows jika ada data; jika kosong/error, pakai publicRows
+  const attendanceRows = useMemo(() => {
+    if (isAdmin && adminRows.length > 0) return adminRows
+    if (publicRows.length > 0) return publicRows as AdminAttendanceRow[]
+    return (adminRows.length > 0 ? adminRows : publicRows) as AdminAttendanceRow[]
+  }, [isAdmin, adminRows, publicRows])
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true)
+    await Promise.allSettled([refetchPublic(), refetchAdmin()])
+    setTimeout(() => setIsRefreshing(false), 500)
+  }
 
   // Supabase Realtime WebSocket listener
   useEffect(() => {
@@ -358,14 +369,29 @@ export function GenerateQR() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-primary" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-success" />
                 </span>
                 <h3 className="font-bold text-sm text-text">Live Monitor Presensi</h3>
+                <span className="text-[10px] bg-success/15 text-success font-semibold px-2 py-0.5 rounded-full border border-success/20">
+                  Live (3s)
+                </span>
               </div>
-              <span className="text-xs font-bold text-primary px-2.5 py-0.5 rounded-full bg-primary/10">
-                {hadirCount} Hadir ({hadirPct}%)
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleManualRefresh}
+                  disabled={isRefreshing}
+                  className="p-1.5 rounded-lg border border-border bg-bg-card hover:bg-bg-elevated text-text-muted hover:text-text transition text-xs flex items-center gap-1"
+                  title="Segarkan data presensi"
+                >
+                  <span className={isRefreshing ? 'animate-spin inline-block' : ''}>🔄</span>
+                  <span className="text-[11px] font-medium hidden sm:inline">Segarkan</span>
+                </button>
+                <span className="text-xs font-semibold text-success bg-success/10 px-2.5 py-1 rounded-full border border-success/20">
+                  {hadirCount} Hadir ({hadirPct}%)
+                </span>
+              </div>
             </div>
 
             {/* Visual Progress Bar */}

@@ -688,6 +688,41 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_get_attendance(uuid, text) TO anon;
 
+CREATE OR REPLACE FUNCTION public.admin_get_attendance_v2(
+  p_event_id uuid,
+  p_token text
+)
+RETURNS TABLE (
+  id uuid,
+  event_id uuid,
+  member_id uuid,
+  status text,
+  note text,
+  attendance_source text,
+  signature_path text,
+  check_in_at timestamptz,
+  submitted_at timestamptz,
+  verified_status text,
+  verified_by text,
+  member_name text,
+  member_group text
+)
+LANGUAGE plpgsql SECURITY DEFINER STABLE SET search_path = public AS $$
+BEGIN
+  PERFORM public.admin_require_session(p_token);
+  RETURN QUERY
+    SELECT a.id, a.event_id, a.member_id, a.status, a.note,
+           a.attendance_source, a.signature_path, a.check_in_at,
+           a.submitted_at, a.verified_status, a.verified_by,
+           m.name, m."group"
+    FROM attendances a
+    LEFT JOIN members m ON m.id = a.member_id
+    WHERE a.event_id = p_event_id
+    ORDER BY m.name;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_get_attendance_v2(uuid, text) TO anon;
+
 -- ============================================
 -- ADMIN CRUD: MEMBERS
 -- ============================================

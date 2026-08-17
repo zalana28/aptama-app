@@ -227,7 +227,11 @@ export function GenerateQR() {
     setError('')
     try {
       await closeQr.mutateAsync(activeEventId)
+      setSelectedEvent('')
       setShowCloseModal(false)
+      await qc.invalidateQueries({ queryKey: ['active-qr-events'] })
+      qc.setQueryData(['active-qr-events'], null)
+      await qc.refetchQueries({ queryKey: ['active-qr-events'] })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Gagal menutup sesi QR.')
     }

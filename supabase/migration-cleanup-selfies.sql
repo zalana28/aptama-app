@@ -24,6 +24,11 @@
 
 BEGIN;
 
+-- 0. View admin pakai SELECT a.* dari attendances — drop dulu (akan dibuat
+--    ulang di langkah 5 setelah kolom face dihapus). Tanpa ini DROP COLUMN
+--    gagal: "2BP01: cannot drop column ... because other objects depend on it"
+DROP VIEW IF EXISTS public.admin_attendance_view;
+
 -- 1. Drop semua policy lama terkait bucket selfies (nama dari berbagai versi migration)
 DROP POLICY IF EXISTS "anon upload selfie" ON storage.objects;
 DROP POLICY IF EXISTS "admin read selfies" ON storage.objects;
@@ -47,5 +52,12 @@ ALTER TABLE members DROP COLUMN IF EXISTS face_selfie_url;
 ALTER TABLE attendances DROP COLUMN IF EXISTS selfie_url;
 ALTER TABLE attendances DROP COLUMN IF EXISTS device_hash;
 ALTER TABLE attendances DROP COLUMN IF EXISTS face_match_score;
+
+-- 5. Buat ulang view admin (definisi identik dengan migration V3)
+CREATE OR REPLACE VIEW public.admin_attendance_view AS
+  SELECT a.*, m.name AS member_name, m."group" AS member_group
+  FROM attendances a
+  LEFT JOIN members m ON m.id = a.member_id;
+GRANT SELECT ON public.admin_attendance_view TO authenticated;
 
 COMMIT;

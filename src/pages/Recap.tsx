@@ -1,8 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import * as XLSX from 'xlsx'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 import {
   BarChart3,
   Calendar,
@@ -12,6 +9,7 @@ import {
   FileSpreadsheet,
   FileText,
   FileDown,
+  Loader2,
 } from 'lucide-react'
 import { useMembers } from '../hooks/useMembers'
 import { useEvents } from '../hooks/useEvents'
@@ -75,11 +73,13 @@ function exportCsv(baris: { name: string; group: string; status: string }[], jud
   URL.revokeObjectURL(url)
 }
 
-function exportExcel(
+async function exportExcel(
   judul: string,
   tanggal: string,
   baris: { name: string; group: string; status: string }[]
 ) {
+  // Dynamic code-splitting: loads xlsx on demand (~350 kB saved from initial bundle)
+  const XLSX = await import('xlsx')
   const rows = baris.map((r, i) => ({
     No: i + 1,
     Nama: r.name,
@@ -92,11 +92,14 @@ function exportExcel(
   XLSX.writeFile(wb, `rekap-${judul.toLowerCase().replace(/\s+/g, '-')}-${tanggal}.xlsx`)
 }
 
-function exportPdf(
+async function exportPdf(
   judul: string,
   tanggal: string,
   baris: { name: string; group: string; status: string }[]
 ) {
+  // Dynamic code-splitting: loads jspdf and autotable on demand (~360 kB saved from initial bundle)
+  const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   doc.setFontSize(15)
   doc.setTextColor(27, 122, 61)
@@ -118,13 +121,14 @@ function exportPdf(
 }
 
 export function Recap() {
-  const { data: events = [] } = useEvents()
-  const { data: members = [] } = useMembers()
+  const { data: events = [], isLoading: eventsLoading } = useEvents()
+  const { data: members = [], isLoading: membersLoading } = useMembers()
   const { isAdmin } = useAdmin()
 
   const [selectedEvent, setSelectedEvent] = useState('')
   const [filterStatus, setFilterStatus] = useState<'all' | 'hadir' | 'izin' | 'alfa'>('all')
   const [search, setSearch] = useState('')
+  const [exportingType, setExportingType] = useState<'pdf' | 'excel' | null>(null)
 
   // Auto-select latest event if not selected
   useEffect(() => {
@@ -209,14 +213,43 @@ export function Recap() {
     exportCsv(getExportRows(), selectedEv.title)
   }
 
-  function handleExportExcel() {
-    if (!selectedEv) return
-    exportExcel(selectedEv.title, selectedEv.date, getExportRows())
+  async function handleExportExcel() {
+    if (!selectedEv || exportingType) return
+    try {
+      setExportingType('excel')
+      await exportExcel(selectedEv.title, selectedEv.date, getExportRows())
+    } finally {
+      setExportingType(null)
+    }
   }
 
-  function handleExportPdf() {
-    if (!selectedEv) return
-    exportPdf(selectedEv.title, selectedEv.date, getExportRows())
+  async function handleExportPdf() {
+    if (!selectedEv || exportingType) return
+    try {
+      setExportingType('pdf')
+      await exportPdf(selectedEv.title, selectedEv.date, getExportRows())
+    } finally {
+      setExportingType(null)
+    }
+  }
+
+  // Shimmer Skeleton Loading while data is loading
+  if (eventsLoading || membersLoading) {
+    return (
+      <div className="space-y-4 py-3 animate-fade-in">
+        <div className="space-y-1.5">
+          <div className="h-6 w-40 bg-bg-card rounded-xl animate-shimmer border border-border/50" />
+          <div className="h-4 w-60 bg-bg-card/60 rounded-lg animate-shimmer border border-border/40" />
+        </div>
+        <div className="h-20 bg-bg-card rounded-2xl animate-shimmer border border-border/50" />
+        <div className="h-36 bg-bg-card rounded-2xl animate-shimmer border border-border/50" />
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-14 bg-bg-card rounded-2xl animate-shimmer border border-border/50" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -371,21 +404,32 @@ export function Recap() {
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={handleExportPdf}
-                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-danger/60 hover:text-danger transition active:scale-95 shadow-xs"
+                disabled={exportingType !== null}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-danger/60 hover:text-danger transition active:scale-95 shadow-xs disabled:opacity-50"
               >
-                <FileText size={14} className="text-danger" />
-                <span>Export PDF</span>
+                {exportingType === 'pdf' ? (
+                  <Loader2 size={14} className="animate-spin text-danger" />
+                ) : (
+                  <FileText size={14} className="text-danger" />
+                )}
+                <span>{exportingType === 'pdf' ? 'Membuat...' : 'Export PDF'}</span>
               </button>
               <button
                 onClick={handleExportExcel}
-                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-success/60 hover:text-success transition active:scale-95 shadow-xs"
+                disabled={exportingType !== null}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-success/60 hover:text-success transition active:scale-95 shadow-xs disabled:opacity-50"
               >
-                <FileSpreadsheet size={14} className="text-success" />
-                <span>Export Excel</span>
+                {exportingType === 'excel' ? (
+                  <Loader2 size={14} className="animate-spin text-success" />
+                ) : (
+                  <FileSpreadsheet size={14} className="text-success" />
+                )}
+                <span>{exportingType === 'excel' ? 'Membuat...' : 'Export Excel'}</span>
               </button>
               <button
                 onClick={handleExportCsv}
-                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-primary/60 transition active:scale-95 shadow-xs"
+                disabled={exportingType !== null}
+                className="flex items-center justify-center gap-1.5 bg-bg-card border border-border text-text px-3 py-2.5 rounded-xl text-xs font-semibold hover:border-primary/60 transition active:scale-95 shadow-xs disabled:opacity-50"
               >
                 <FileDown size={14} className="text-primary" />
                 <span>Export CSV</span>

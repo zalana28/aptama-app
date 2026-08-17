@@ -220,6 +220,9 @@ export function GenerateQR() {
     await qc.invalidateQueries({ queryKey: ['active-qr-events'] })
     await qc.refetchQueries({ queryKey: ['active-qr-events'] })
     qc.refetchQueries({ queryKey: ['admin_attendance', selectedEvent] })
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try { navigator.vibrate(40) } catch {}
+    }
   }
 
   async function handleCloseQr() {
@@ -229,6 +232,9 @@ export function GenerateQR() {
       await closeQr.mutateAsync(activeEventId)
       setSelectedEvent('')
       setShowCloseModal(false)
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try { navigator.vibrate([40, 60, 40]) } catch {}
+      }
       await qc.invalidateQueries({ queryKey: ['active-qr-events'] })
       qc.setQueryData(['active-qr-events'], null)
       await qc.refetchQueries({ queryKey: ['active-qr-events'] })

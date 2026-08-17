@@ -136,6 +136,12 @@ export function ScanPage() {
         return
       }
       setResultMessage(result.message ?? 'Absensi berhasil!')
+      // Haptic tactile feedback on mobile devices
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        try {
+          navigator.vibrate([40, 60, 40])
+        } catch {}
+      }
       setStep('done')
     } catch (err: unknown) {
       await removeUploadedSignature(uploadedPath)

@@ -1,33 +1,20 @@
 -- ============================================================
--- MIGRATION: Cleanup selfie/face feature (audit K2)
+-- MIGRATION: Cleanup selfie/face feature (audit K2) — v3 (CASCADE)
 -- ============================================================
--- Latar belakang:
---   Fitur verifikasi wajah (face-api.js) sudah dihapus sejak
---   migration signature (V3), TAPI artefaknya masih tertinggal:
---     - Policy storage "anon upload selfie" & "admin read selfies"
---       masih membuka akses ANON ke bucket 'selfies'
---     - Isi bucket 'selfies' (foto wajah anggota) masih ada
---     - Kolom PII biometrik (face_descriptor, face_selfie_url, dll)
---       masih ada di tabel members & attendances
---   Audit membuktikan anon bisa LIST semua foto wajah + membuat
---   signed URL (hanya dengan kunci publik frontend).
---
--- Isi migration ini:
---   1. Drop SEMUA policy lama terkait bucket selfies
---   2. Hapus semua objek foto wajah di bucket 'selfies'
---   3. Hapus bucket 'selfies'
---   4. Hapus kolom face_* / selfie_url / device_hash / face_match_score
---      (constraint & index yang bergantung ikut terhapus otomatis)
---
--- Idempotent (aman di-run ulang). Jalankan di SQL Editor Supabase.
+-- v2 gagal di produksi: "2BP01 cannot drop column selfie_url ...
+-- view admin_attendance_view depends on column" — berarti di produksi
+-- view-nya ada di schema selain public (DROP VIEW IF EXISTS public.*
+-- jadi no-op). v3 memakai CASCADE: PostgreSQL otomatis men-drop SEMUA
+-- view yang mereferensikan kolom face (di schema mana pun), lalu view
+-- admin dibuat ulang di langkah 5. CASCADE juga men-drop view legacy
+-- yang membangun di atasnya — itu memang artefak fitur face.
+-- Idempotent. Jalankan di SQL Editor Supabase.
 -- ============================================================
 
 BEGIN;
 
--- 0. View admin pakai SELECT a.* dari attendances — drop dulu (akan dibuat
---    ulang di langkah 5 setelah kolom face dihapus). Tanpa ini DROP COLUMN
---    gagal: "2BP01: cannot drop column ... because other objects depend on it"
-DROP VIEW IF EXISTS public.admin_attendance_view;
+-- 0. Drop view admin di schema public (jika ada) + view yang membangun di atasnya
+DROP VIEW IF EXISTS public.admin_attendance_view CASCADE;
 
 -- 1. Drop semua policy lama terkait bucket selfies (nama dari berbagai versi migration)
 DROP POLICY IF EXISTS "anon upload selfie" ON storage.objects;
@@ -43,15 +30,16 @@ DELETE FROM storage.objects WHERE bucket_id = 'selfies';
 -- 3. Hapus bucket-nya
 DELETE FROM storage.buckets WHERE id = 'selfies';
 
--- 4. Hapus kolom PII biometrik
-ALTER TABLE members DROP COLUMN IF EXISTS face_descriptor;
-ALTER TABLE members DROP COLUMN IF EXISTS face_status;
-ALTER TABLE members DROP COLUMN IF EXISTS face_enrolled_at;
-ALTER TABLE members DROP COLUMN IF EXISTS face_selfie_url;
+-- 4. Hapus kolom PII biometrik. CASCADE: view dependen (di schema mana pun,
+--    dengan nama apa pun) ikut terhapus otomatis — semuanya artefak face
+ALTER TABLE members DROP COLUMN IF EXISTS face_descriptor CASCADE;
+ALTER TABLE members DROP COLUMN IF EXISTS face_status CASCADE;
+ALTER TABLE members DROP COLUMN IF EXISTS face_enrolled_at CASCADE;
+ALTER TABLE members DROP COLUMN IF EXISTS face_selfie_url CASCADE;
 
-ALTER TABLE attendances DROP COLUMN IF EXISTS selfie_url;
-ALTER TABLE attendances DROP COLUMN IF EXISTS device_hash;
-ALTER TABLE attendances DROP COLUMN IF EXISTS face_match_score;
+ALTER TABLE attendances DROP COLUMN IF EXISTS selfie_url CASCADE;
+ALTER TABLE attendances DROP COLUMN IF EXISTS device_hash CASCADE;
+ALTER TABLE attendances DROP COLUMN IF EXISTS face_match_score CASCADE;
 
 -- 5. Buat ulang view admin (definisi identik dengan migration V3)
 CREATE OR REPLACE VIEW public.admin_attendance_view AS

@@ -49,7 +49,7 @@ export function AdminLogin() {
     }
 
     setResetLoading(true)
-    const { error: rpcError } = await supabase.rpc('admin_reset_pin', {
+    const { data, error: rpcError } = await supabase.rpc('admin_reset_pin', {
       p_recovery_pin: recoveryPin,
       p_new_pin: newPin,
     })
@@ -57,6 +57,24 @@ export function AdminLogin() {
 
     if (rpcError) {
       setError(rpcError.message || 'Gagal reset PIN.')
+      return
+    }
+
+    const res = data as
+      | { success: boolean; error_code?: string; retry_after?: number; message?: string }
+      | undefined
+
+    if (!res?.success) {
+      if (res?.error_code === 'rate_limited') {
+        const minutes = res.retry_after ? Math.max(1, Math.ceil(res.retry_after / 60)) : 5
+        setError(`Terlalu banyak percobaan. Coba lagi dalam ${minutes} menit.`)
+      } else if (res?.error_code === 'invalid_recovery_pin') {
+        setError('Recovery PIN salah.')
+      } else if (res?.error_code === 'invalid_new_pin') {
+        setError('PIN baru minimal 4 digit.')
+      } else {
+        setError('Gagal reset PIN.')
+      }
       return
     }
 

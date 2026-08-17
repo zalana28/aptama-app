@@ -298,7 +298,9 @@ BEGIN
   RETURN v_hash = encode(digest(p_pin, 'sha256'), 'hex');
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
+-- REMOVED: admin_verify_pin is an internal helper called only from SECURITY DEFINER RPCs.
+-- Direct anon access was revoked in migration-signature.sql (line 1133).
+-- DO NOT re-grant: GRANT EXECUTE ON FUNCTION public.admin_verify_pin(text) TO anon;
 
 -- Ganti PIN + recovery PIN
 CREATE OR REPLACE FUNCTION public.admin_change_pin(
@@ -328,12 +330,31 @@ CREATE OR REPLACE FUNCTION public.admin_reset_pin(
   p_recovery_pin text,
   p_new_pin text
 )
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
-DECLARE v_hash text;
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE
+  v_hash text;
+  v_fail_count int;
 BEGIN
+  -- Serialize concurrent attempts (same pattern as admin_login)
+  PERFORM pg_advisory_xact_lock(hashtext('aptama_admin_reset'));
+  -- Housekeeping: purge expired sessions (cheap, amortized).
+  DELETE FROM admin_sessions WHERE expires_at < now();
+  -- Rate limit: max 5 failures per 5 minutes (shared counter with admin_login)
+  SELECT count(*) INTO v_fail_count
+  FROM admin_pin_attempts
+  WHERE attempted_at > now() - interval '5 minutes' AND success = false;
+  IF v_fail_count >= 5 THEN
+    RAISE EXCEPTION 'Terlalu banyak percobaan. Coba lagi dalam beberapa menit.';
+  END IF;
   SELECT value INTO v_hash FROM admin_config WHERE key = 'recovery_pin_hash';
   IF v_hash IS DISTINCT FROM encode(digest(p_recovery_pin, 'sha256'), 'hex') THEN
+    INSERT INTO admin_pin_attempts (success, attempted_at) VALUES (false, now());
     RAISE EXCEPTION 'Recovery PIN salah';
+  END IF;
+  -- Success: clear failed attempts
+  DELETE FROM admin_pin_attempts WHERE success = false;
+  IF p_new_pin IS NULL OR length(trim(p_new_pin)) < 4 THEN
+    RAISE EXCEPTION 'PIN baru minimal 4 digit.';
   END IF;
   UPDATE admin_config SET value = encode(digest(p_new_pin, 'sha256'), 'hex') WHERE key = 'pin_hash';
 END;
@@ -341,6 +362,9 @@ $$;
 GRANT EXECUTE ON FUNCTION public.admin_reset_pin(text, text) TO anon;
 
 -- Generate QR token
+-- DEPRECATED: superseded by admin_generate_checkin_qr (session-based auth).
+-- This function is dropped by migration-signature.sql.
+-- Kept here only for reference / initial bootstrap before migration.
 CREATE OR REPLACE FUNCTION public.generate_qr_token(
   p_event_id uuid,
   p_pin text,
@@ -402,21 +426,16 @@ CREATE OR REPLACE FUNCTION public.admin_close_checkin_qr(
   p_event_id uuid
 )
 RETURNS boolean
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  IF NOT public.admin_verify_session(p_token) AND NOT public.admin_verify_pin(p_token) THEN
-    RAISE EXCEPTION 'Sesi admin tidak valid';
-  END IF;
-
+  PERFORM public.admin_require_session(p_token);
   UPDATE events
   SET checkin_token = NULL,
       checkin_expires_at = now()
   WHERE id = p_event_id;
-
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Kegiatan tidak ditemukan';
   END IF;
-
   RETURN true;
 END;
 $$;

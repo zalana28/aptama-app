@@ -8,23 +8,17 @@ CREATE OR REPLACE FUNCTION public.admin_close_checkin_qr(
   p_event_id uuid
 )
 RETURNS boolean
-LANGUAGE plpgsql SECURITY DEFINER AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  IF NOT public.admin_verify_session(p_token) AND NOT public.admin_verify_pin(p_token) THEN
-    RAISE EXCEPTION 'Sesi admin tidak valid';
-  END IF;
-
+  PERFORM public.admin_require_session(p_token);
   UPDATE events
   SET checkin_token = NULL,
       checkin_expires_at = now()
   WHERE id = p_event_id;
-
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Kegiatan tidak ditemukan';
   END IF;
-
   RETURN true;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.admin_close_checkin_qr(text, uuid) TO anon;

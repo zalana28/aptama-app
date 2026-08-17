@@ -396,6 +396,32 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.admin_generate_checkin_qr(text, uuid, int) TO anon;
 
+-- Tutup / akhiri sesi QR absen secara manual oleh Ketua
+CREATE OR REPLACE FUNCTION public.admin_close_checkin_qr(
+  p_token text,
+  p_event_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+BEGIN
+  IF NOT public.admin_verify_session(p_token) AND NOT public.admin_verify_pin(p_token) THEN
+    RAISE EXCEPTION 'Sesi admin tidak valid';
+  END IF;
+
+  UPDATE events
+  SET checkin_token = NULL,
+      checkin_expires_at = now()
+  WHERE id = p_event_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Kegiatan tidak ditemukan';
+  END IF;
+
+  RETURN true;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.admin_close_checkin_qr(text, uuid) TO anon;
+
 -- Ambil QR aktif untuk satu kegiatan (untuk ditampilkan di halaman Check-in oleh ketua)
 CREATE OR REPLACE FUNCTION public.get_active_qr_tokens(p_event_id uuid)
 RETURNS TABLE (

@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
 import { QRCodeSVG } from 'qrcode.react'
-import { QrCode, Copy, Check, Sparkles, AlertCircle } from 'lucide-react'
+import { QrCode, Copy, Check, Sparkles, AlertCircle, BarChart3 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAdmin } from '../hooks/useAdmin'
 
 interface ActiveQr {
   event_id: string
@@ -17,6 +18,7 @@ interface ActiveQr {
 }
 
 export function ScanQrPage() {
+  const { isAdmin } = useAdmin()
   const [copied, setCopied] = useState(false)
 
   const { data: activeQrEvent, isLoading } = useQuery({
@@ -123,6 +125,19 @@ export function ScanQrPage() {
                 </>
               )}
             </button>
+
+            {/* Admin Live Monitor & Management Shortcut */}
+            {isAdmin && (
+              <div className="pt-2 border-t border-border/60">
+                <Link
+                  to="/generate-qr"
+                  className="flex items-center justify-center gap-2 w-full bg-primary/10 border border-primary/30 text-primary py-2.5 px-4 rounded-xl text-xs font-bold hover:bg-primary/20 transition"
+                >
+                  <BarChart3 size={15} />
+                  <span>👀 Buka Live Monitor & Kelola Sesi QR</span>
+                </Link>
+              </div>
+            )}
           </div>
         </motion.div>
       ) : (
